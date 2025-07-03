@@ -2,63 +2,64 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="google-site-verification" content="s3G97-DMLRZ1OlBWRJJ0rkPvbbrD28kfx470hljz0W4" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>EEE - Event Reminder</title>
-  <link rel="stylesheet" href="Proemail.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Event Dashboard</title>
+  <link href="eee.css" rel="stylesheet">
 </head>
 <body>
-  <div class="overlay" id="overlay"></div>
-
-  <header>
-    <div class="left-header">
-      <button id="menu-toggle"><i class="fas fa-bars"></i></button>
-      <div class="logo">EEE Dashboard</div>
+  <div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
+  <div class="sidebar" id="sidebar">
+    <div>
+      <button class="menu-btn" onclick="toggleSidebar()">☰</button>
     </div>
-    <div class="nav-buttons">
-      <button id="loginBtn">Log in</button>
-      <button id="signupBtn">Sign up</button>
+    <div class="menu">
+      <div class="menu-item">📅 <span>Upcoming (<span id="upcoming-count">0</span>)</span></div>
+      <div class="menu-item">✅ <span>Attended (<span id="attended-count">0</span>)</span></div>
+      <div class="menu-item">❌ <span>Missed (<span id="missed-count">0</span>)</span></div>
+      <div class="menu-item login-sign-up" id="login-button">
+        👤 <span>Login with Google</span>
+      </div>
     </div>
-  </header>
+  </div>
 
-  <!-- Sidebar Layer (Topbar Color Match) -->
-  <div class="sidebar-layer"></div>
+  <div class="content" id="mainContent">
+    <div class="topbar">
+      <h1>Event Email Extraction</h1>
+    </div>
 
-  <!-- Sliding Sidebar -->
-  <aside class="sidebar" id="sidebar">
-    <h2><i class="fas fa-bars"></i> Menu</h2>
-    <a href="#"><i class="fas fa-home"></i> Home</a>
-    <a href="#"><i class="fas fa-info-circle"></i> About</a>
-    <a href="#"><i class="fas fa-envelope"></i> Contact</a>
-  </aside>
+    <!-- Email List Section -->
+    <div id="email-section" style="margin-bottom: 1rem;">
+      <h2>Emails</h2>
+      <div id="email-list" style="max-height: 200px; overflow-y: auto; margin-bottom: 1rem;"></div>
+      <div id="email-loading" style="display: none;">Loading emails...</div>
+      <div id="email-error" style="color: red; display: none;"></div>
+    </div>
 
-  <!-- Main Content -->
-  <main id="main-content">
-    <section class="overview">
-      <div class="card">Upcoming<br><span id="upcoming-count">8</span></div>
-      <div class="card">Attended<br><span id="attended-count">24</span></div>
-      <div class="card">Missed<br><span id="missed-count">3</span></div>
-    </section>
+    <!-- Search and Add Event -->
+    <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+      <input type="text" id="search-events" placeholder="Search events..." style="padding: 0.5rem; border-radius: 4px; border: none; flex-grow: 1; max-width: 300px;">
+      <button id="add-event-btn" style="padding: 0.5rem 1rem; background-color: #ec4899; border: none; border-radius: 4px; color: white;" disabled>+ Add Event</button>
+    </div>
 
-    <section class="events">
-      <h2>Upcoming Events</h2>
-      <div class="event-card">
-        <h3>Weekly Team Standup</h3>
-        <p> June 15, 2025<br> 9:00 AM - 10:00 AM<br> Conference Room A</p>
-      </div>
-      <div class="event-card">
-        <h3>Product Strategy Review</h3>
-        <p> June 16, 2025<br> 2:00 PM - 4:00 PM<br> Executive Boardroom</p>
-      </div>
-    </section>
-  </main>
+    <!-- Events Section -->
+    <div class="events" id="events-list">
+      <div id="events-loading" style="display: none;">Loading events...</div>
+      <div id="events-error" style="color: red; display: none;"></div>
+    </div>
 
-  <!-- Footer -->
-  <footer style="text-align: center; padding: 20px; background-color: #f4f4f4; font-size: 14px;">
-    <a href="policy.html" style="color: #333; text-decoration: none;">Privacy Policy</a>
-  </footer>
+    <!-- Summary Section -->
+    <div class="summary">
+      <div class="card"><span id="total-events">0</span><br><small>Total Events</small></div>
+      <div class="card"><span id="this-week-events">0</span><br><small>This Week</small></div>
+      <div class="card"><span id="total-attendees">0</span><br><small>Total Attendees</small></div>
+    </div>
 
-  <script src="Proemail.js"></script>
+    <footer>
+      © 2025 Event Email Extractor — <a href="privacy_updated.html" style="color: white; text-decoration: underline;">Privacy Policy</a>
+    </footer>
+  </div>
+
+  <script src="https://apis.google.com/js/platform.js" async defer></script>
+  <script src="eee.js"></script>
 </body>
 </html>
