@@ -9,7 +9,7 @@ function toggleSidebar() {
 // Global variables
 let auth2;
 let accessToken = null;
-const BACKEND_URL = "http://localhost:5000"; // Change to your deployed backend URL
+const BACKEND_URL = "https://email-backend-bu9l.onrender.com"; // Change to your deployed backend URL
 
 // Initialize Google Auth
 function initGoogleAuth() {
