@@ -4,14 +4,12 @@
   padding: 0;
   font-family: 'Inter', sans-serif;
 }
-
 body {
   background: linear-gradient(to bottom right, violet, blue);
   color: white;
   min-height: 100vh;
   overflow-x: hidden;
 }
-
 .sidebar {
   position: fixed;
   top: 0;
@@ -25,11 +23,9 @@ body {
   width: 60px;
   transition: width 0.3s ease;
 }
-
 .sidebar.open {
   width: 250px;
 }
-
 .sidebar .header {
   padding: 20px;
   font-size: 1.5rem;
@@ -37,50 +33,25 @@ body {
   color: white;
   text-align: center;
 }
-
 .sidebar .menu {
   padding: 20px;
 }
-
 .sidebar .menu-item {
   display: flex;
   align-items: center;
   margin: 10px 0;
   gap: 10px;
   font-weight: 600;
-  padding: 10px 16px;
-  border-radius: 6px;
+}
+.login-sign-up {
   cursor: pointer;
-  transition: background-color 0.3s ease;
 }
-
-.sidebar .menu-item:hover {
-  background-color: #f0f0f0;
-}
-
-.sidebar .menu-item:active {
-  background-color: #e0e0e0;
-}
-
 .sidebar .menu-item span {
   display: none;
 }
-
 .sidebar.open .menu-item span {
   display: inline;
 }
-
-/* Style for Login with Google */
-.sidebar .menu-item.login-sign-up {
-  background-color: #8b5cf6;
-  color: white;
-  font-weight: bold;
-}
-
-.sidebar .menu-item.login-sign-up:hover {
-  background-color: #7c3aed;
-}
-
 .overlay {
   position: fixed;
   inset: 0;
@@ -89,28 +60,23 @@ body {
   z-index: 1000;
   display: none;
 }
-
 .overlay.show {
   display: block;
 }
-
 .topbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 1rem;
 }
-
 .content {
   margin-left: 60px;
   padding: 1rem;
   transition: margin-left 0.3s ease;
 }
-
 .sidebar.open ~ .content {
   margin-left: 250px;
 }
-
 .card {
   background: white;
   color: #333;
@@ -118,22 +84,18 @@ body {
   border-radius: 8px;
   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
 }
-
 .events, .summary {
   display: grid;
   gap: 1rem;
 }
-
 .events {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
-
 .summary {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   margin-top: 2rem;
   text-align: center;
 }
-
 .menu-btn {
   font-size: 24px;
   background: none;
@@ -144,7 +106,6 @@ body {
   padding-left: 20px;
   padding-top: 10px;
 }
-
 footer {
   margin-top: 2rem;
   padding: 1rem;
@@ -152,18 +113,15 @@ footer {
   font-size: 0.9rem;
   opacity: 0.8;
 }
-
 @media(min-width: 1024px) {
   .overlay {
     display: none !important;
   }
 }
-
 /* Email list styling */
 #email-section {
   margin-bottom: 1rem;
 }
-
 #email-list {
   max-height: 200px;
   overflow-y: auto;
@@ -171,7 +129,6 @@ footer {
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
-
 .email-item {
   padding: 0.75rem;
   cursor: pointer;
@@ -179,11 +136,9 @@ footer {
   color: #333;
   transition: background-color 0.2s;
 }
-
 .email-item:hover {
   background-color: #f5f5f5;
 }
-
 /* Loading and error states */
 #email-loading, #events-loading {
   color: #333;
@@ -192,7 +147,6 @@ footer {
   background: white;
   border-radius: 8px;
 }
-
 #email-error, #events-error {
   color: #e3342f;
   text-align: center;
