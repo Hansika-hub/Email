@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="google-signin-client_id" content="721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com">
   <title>Event Dashboard</title>
   <link href="Proemail.css" rel="stylesheet">
 </head>
@@ -16,9 +17,9 @@
       <div class="menu-item">📅 <span>Upcoming (<span id="upcoming-count">0</span>)</span></div>
       <div class="menu-item">✅ <span>Attended (<span id="attended-count">0</span>)</span></div>
       <div class="menu-item">❌ <span>Missed (<span id="missed-count">0</span>)</span></div>
-      <div class="menu-item login-sign-up" id="login-button">
+      <button class="menu-item login-sign-up" id="login-button" style="background: none; border: none; cursor: pointer;">
         👤 <span>Login with Google</span>
-      </div>
+      </button>
     </div>
   </div>
 
@@ -59,6 +60,7 @@
     </footer>
   </div>
 
+  <!-- Google Platform Script -->
   <script src="https://apis.google.com/js/platform.js" async defer></script>
   <script src="Proemail.js"></script>
 </body>
