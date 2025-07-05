@@ -179,8 +179,8 @@ function setupSearch() {
   });
 }
 document.addEventListener('DOMContentLoaded', () => {
-  initGoogleAuth();
-  setupSearch();
+  setupSearch(); // Only search setup here
 });
+
 
 
