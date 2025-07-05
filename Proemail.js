@@ -181,6 +181,6 @@ function setupSearch() {
 
 // DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
-  initGoogleAuth();
-  setupSearch();
+  setupSearch(); // Only search setup here
 });
+
