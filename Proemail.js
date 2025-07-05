@@ -15,12 +15,16 @@ let accessToken = null;
 // Google Auth Init
 function initGoogleAuth() {
     gapi.load('auth2', () => {
-        auth2 = gapi.auth2.init({
-            client_id: '721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com',
-            scope: 'https://www.googleapis.com/auth/gmail.readonly',
-        });
+        try {
+            auth2 = gapi.auth2.init({
+                client_id: '721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com',
+                scope: 'https://www.googleapis.com/auth/gmail.readonly',
+            });
+            console.log('Google Auth initialized successfully');
+        } catch (error) {
+            console.error('Google Auth initialization failed:', error);
+        }
 
-        // Bind click event to login button
         const loginButton = document.getElementById('login-button');
         loginButton.addEventListener('click', async () => {
             if (!auth2) {
@@ -31,21 +35,18 @@ function initGoogleAuth() {
             try {
                 const user = await auth2.signIn();
                 accessToken = user.getAuthResponse().access_token;
+                console.log('Signed in, access token:', accessToken);
 
-                // Update UI
                 loginButton.innerHTML = '👤 <span>Logged In</span>';
                 loginButton.disabled = true;
 
-                // Send token to backend
                 const res = await fetch(`${BACKEND_URL}/`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ accessToken }),
                 });
 
-                if (!res.ok) throw new Error("Token send failed");
-
-                // Fetch Emails
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                 fetchEmails();
             } catch (err) {
                 console.error("Google Sign-In error:", err);
