@@ -1,9 +1,9 @@
 // Sidebar toggle
 function toggleSidebar() {
-  const sidebar = document.getElementById('sidebar');
-  const overlay = document.getElementById('overlay');
-  sidebar.classList.toggle('open');
-  overlay.classList.toggle('show');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('overlay');
+    sidebar.classList.toggle('open');
+    overlay.classList.toggle('show');
 }
 
 // Backend URL
@@ -14,173 +14,173 @@ let accessToken = null;
 
 // Google Auth Init
 function initGoogleAuth() {
-  gapi.load('auth2', () => {
-    auth2 = gapi.auth2.init({
-      client_id: '721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com',
-      scope: 'https://www.googleapis.com/auth/gmail.readonly',
-    });
-
-    // Bind click event to login button
-    const loginButton = document.getElementById('login-button');
-    loginButton.addEventListener('click', async () => {
-      if (!auth2) {
-        alert("Google Auth still loading. Try again shortly.");
-        return;
-      }
-
-      try {
-        const user = await auth2.signIn();
-        accessToken = user.getAuthResponse().access_token;
-
-        // Update UI
-        loginButton.innerHTML = '👤 <span>Logged In</span>';
-        loginButton.disabled = true;
-
-        // Send token to backend
-        const res = await fetch(`${BACKEND_URL}/`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ accessToken }),
+    gapi.load('auth2', () => {
+        auth2 = gapi.auth2.init({
+            client_id: '721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com',
+            scope: 'https://www.googleapis.com/auth/gmail.readonly',
         });
 
-        if (!res.ok) throw new Error("Token send failed");
+        // Bind click event to login button
+        const loginButton = document.getElementById('login-button');
+        loginButton.addEventListener('click', async () => {
+            if (!auth2) {
+                alert("Google Auth still loading. Try again shortly.");
+                return;
+            }
 
-        // Fetch Emails
-        fetchEmails();
-      } catch (err) {
-        console.error("Google Sign-In error:", err);
-        const errBox = document.getElementById('email-error');
-        errBox.style.display = 'block';
-        errBox.textContent = "Login failed. Try again.";
-      }
+            try {
+                const user = await auth2.signIn();
+                accessToken = user.getAuthResponse().access_token;
+
+                // Update UI
+                loginButton.innerHTML = '👤 <span>Logged In</span>';
+                loginButton.disabled = true;
+
+                // Send token to backend
+                const res = await fetch(`${BACKEND_URL}/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ accessToken }),
+                });
+
+                if (!res.ok) throw new Error("Token send failed");
+
+                // Fetch Emails
+                fetchEmails();
+            } catch (err) {
+                console.error("Google Sign-In error:", err);
+                const errBox = document.getElementById('email-error');
+                errBox.style.display = 'block';
+                errBox.textContent = "Login failed. Try again.";
+            }
+        });
     });
-  });
 }
 
 // Fetch Emails from backend
 async function fetchEmails() {
-  const emailList = document.getElementById('email-list');
-  const emailLoading = document.getElementById('email-loading');
-  const emailError = document.getElementById('email-error');
+    const emailList = document.getElementById('email-list');
+    const emailLoading = document.getElementById('email-loading');
+    const emailError = document.getElementById('email-error');
 
-  emailLoading.style.display = 'block';
-  emailError.style.display = 'none';
+    emailLoading.style.display = 'block';
+    emailError.style.display = 'none';
 
-  try {
-    const res = await fetch(`${BACKEND_URL}/fetch_emails`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+    try {
+        const res = await fetch(`${BACKEND_URL}/fetch_emails`, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+        });
 
-    if (!res.ok) throw new Error("Email fetch failed");
+        if (!res.ok) throw new Error("Email fetch failed");
 
-    const emails = await res.json();
-    emailList.innerHTML = '';
+        const emails = await res.json();
+        emailList.innerHTML = '';
 
-    emails.forEach(email => {
-      const div = document.createElement('div');
-      div.className = 'email-item';
-      div.textContent = email.subject || 'No Subject';
-      div.addEventListener('click', () => fetchEvents(email.id));
-      emailList.appendChild(div);
-    });
+        emails.forEach(email => {
+            const div = document.createElement('div');
+            div.className = 'email-item';
+            div.textContent = email.subject || 'No Subject';
+            div.addEventListener('click', () => fetchEvents(email.id));
+            emailList.appendChild(div);
+        });
 
-  } catch (err) {
-    console.error(err);
-    emailError.style.display = 'block';
-    emailError.textContent = 'Failed to fetch emails.';
-  } finally {
-    emailLoading.style.display = 'none';
-  }
+    } catch (err) {
+        console.error(err);
+        emailError.style.display = 'block';
+        emailError.textContent = 'Failed to fetch emails.';
+    } finally {
+        emailLoading.style.display = 'none';
+    }
 }
 
 // Process single email and extract events
 async function fetchEvents(emailId) {
-  const eventsList = document.getElementById('events-list');
-  const eventsLoading = document.getElementById('events-loading');
-  const eventsError = document.getElementById('events-error');
+    const eventsList = document.getElementById('events-list');
+    const eventsLoading = document.getElementById('events-loading');
+    const eventsError = document.getElementById('events-error');
 
-  eventsLoading.style.display = 'block';
-  eventsError.style.display = 'none';
+    eventsLoading.style.display = 'block';
+    eventsError.style.display = 'none';
 
-  try {
-    const res = await fetch(`${BACKEND_URL}/process_emails`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({ emailId }),
-    });
+    try {
+        const res = await fetch(`${BACKEND_URL}/process_emails`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({ emailId }),
+        });
 
-    if (!res.ok) throw new Error("Event extraction failed");
+        if (!res.ok) throw new Error("Event extraction failed");
 
-    const events = await res.json();
-    eventsList.innerHTML = '';
+        const events = await res.json();
+        eventsList.innerHTML = '';
 
-    events.forEach(event => {
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.innerHTML = `
-        <div style="color: #8b5cf6; font-weight: bold;">${event.type || 'Event'}</div>
-        <h2>${event.event_name || 'No Title'}</h2>
-        <p>📅 ${event.date || 'N/A'}</p>
-        <p>⏰ ${event.time || 'N/A'}</p>
-        <p>📍 ${event.venue || 'N/A'}</p>
-        <p>👥 ${event.attendees || 0} attendees</p>
-      `;
-      eventsList.appendChild(card);
-    });
+        events.forEach(event => {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+                <div style="color: #8b5cf6; font-weight: bold;">${event.type || 'Event'}</div>
+                <h2>${event.event_name || 'No Title'}</h2>
+                <p>📅 ${event.date || 'N/A'}</p>
+                <p>⏰ ${event.time || 'N/A'}</p>
+                <p>📍 ${event.venue || 'N/A'}</p>
+                <p>👥 ${event.attendees || 0} attendees</p>
+            `;
+            eventsList.appendChild(card);
+        });
 
-    updateSummary(events);
+        updateSummary(events);
 
-  } catch (err) {
-    console.error(err);
-    eventsError.style.display = 'block';
-    eventsError.textContent = 'No events found for this email.';
-  } finally {
-    eventsLoading.style.display = 'none';
-  }
+    } catch (err) {
+        console.error(err);
+        eventsError.style.display = 'block';
+        eventsError.textContent = 'No events found for this email.';
+    } finally {
+        eventsLoading.style.display = 'none';
+    }
 }
 
 // Update summary counts
 function updateSummary(events) {
-  const total = events.length;
-  const today = new Date();
-  const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - today.getDay());
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 6);
+    const total = events.length;
+    const today = new Date();
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay());
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
 
-  const thisWeek = events.filter(ev => {
-    const dt = new Date(ev.date);
-    return dt >= weekStart && dt <= weekEnd;
-  }).length;
+    const thisWeek = events.filter(ev => {
+        const dt = new Date(ev.date);
+        return dt >= weekStart && dt <= weekEnd;
+    }).length;
 
-  const attendees = events.reduce((sum, ev) => sum + (parseInt(ev.attendees) || 0), 0);
+    const attendees = events.reduce((sum, ev) => sum + (parseInt(ev.attendees) || 0), 0);
 
-  document.getElementById('total-events').textContent = total;
-  document.getElementById('this-week-events').textContent = thisWeek;
-  document.getElementById('total-attendees').textContent = attendees;
-  document.getElementById('upcoming-count').textContent = total;
-  document.getElementById('attended-count').textContent = 0;
-  document.getElementById('missed-count').textContent = 0;
+    document.getElementById('total-events').textContent = total;
+    document.getElementById('this-week-events').textContent = thisWeek;
+    document.getElementById('total-attendees').textContent = attendees;
+    document.getElementById('upcoming-count').textContent = total;
+    document.getElementById('attended-count').textContent = 0;
+    document.getElementById('missed-count').textContent = 0;
 }
 
 // Search events
 function setupSearch() {
-  const input = document.getElementById('search-events');
-  input.addEventListener('input', (e) => {
-    const val = e.target.value.toLowerCase();
-    const cards = document.querySelectorAll('.events .card');
-    cards.forEach(c => {
-      const title = c.querySelector('h2').textContent.toLowerCase();
-      c.style.display = title.includes(val) ? 'block' : 'none';
+    const input = document.getElementById('search-events');
+    input.addEventListener('input', (e) => {
+        const val = e.target.value.toLowerCase();
+        const cards = document.querySelectorAll('.events .card');
+        cards.forEach(c => {
+            const title = c.querySelector('h2').textContent.toLowerCase();
+            c.style.display = title.includes(val) ? 'block' : 'none';
+        });
     });
-  });
 }
-document.addEventListener('DOMContentLoaded', () => {
-  setupSearch(); // Only search setup here
-});
 
-
-
+// Initialize Google Auth when the page loads
+window.onload = function() {
+    gapi.load('client:auth2', initGoogleAuth);
+    setupSearch();
+};
