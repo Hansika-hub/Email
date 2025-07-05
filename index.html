@@ -61,7 +61,13 @@
   </div>
 
   <!-- Google Platform Script -->
-  <script src="https://apis.google.com/js/platform.js" async defer></script>
-  <script src="Proemail.js"></script>
+  <script src="https://apis.google.com/js/platform.js" onload="onGapiLoad()" defer></script>
+  <script>
+    function onGapiLoad() {
+      initGoogleAuth(); // Now call init after gapi is ready
+    }
+  </script>
+  <script src="Proemail.js" defer></script>
+
 </body>
 </html>
