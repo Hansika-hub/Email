@@ -1,4 +1,4 @@
-// Sidebar toggle function
+// Sidebar toggle
 function toggleSidebar() {
   const sidebar = document.getElementById('sidebar');
   const overlay = document.getElementById('overlay');
@@ -6,12 +6,13 @@ function toggleSidebar() {
   overlay.classList.toggle('show');
 }
 
-// Global variables
+// Backend URL
+const BACKEND_URL = "https://email-backend-bu9l.onrender.com";
+
 let auth2;
 let accessToken = null;
-const BACKEND_URL = "https://email-backend-bu9l.onrender.com"; // Change to your deployed backend URL
 
-// Initialize Google Auth
+// Google Auth Init
 function initGoogleAuth() {
   gapi.load('auth2', () => {
     auth2 = gapi.auth2.init({
@@ -19,90 +20,90 @@ function initGoogleAuth() {
       scope: 'https://www.googleapis.com/auth/gmail.readonly',
     });
 
-    // Setup login click listener AFTER auth2 is ready
-    setupLoginButton();
+    // Bind click event to login button
+    const loginButton = document.getElementById('login-button');
+    loginButton.addEventListener('click', async () => {
+      if (!auth2) {
+        alert("Google Auth still loading. Try again shortly.");
+        return;
+      }
+
+      try {
+        const user = await auth2.signIn();
+        accessToken = user.getAuthResponse().access_token;
+
+        // Update UI
+        loginButton.innerHTML = '👤 <span>Logged In</span>';
+        loginButton.disabled = true;
+
+        // Send token to backend
+        const res = await fetch(`${BACKEND_URL}/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accessToken }),
+        });
+
+        if (!res.ok) throw new Error("Token send failed");
+
+        // Fetch Emails
+        fetchEmails();
+      } catch (err) {
+        console.error("Google Sign-In error:", err);
+        const errBox = document.getElementById('email-error');
+        errBox.style.display = 'block';
+        errBox.textContent = "Login failed. Try again.";
+      }
+    });
   });
 }
 
-// Setup login button click
-function setupLoginButton() {
-  const loginButton = document.getElementById('login-button');
-  loginButton.addEventListener('click', async () => {
-    if (!auth2) {
-      alert("Google Auth is still initializing. Try again shortly.");
-      return;
-    }
-
-    try {
-      const googleUser = await auth2.signIn();
-      accessToken = googleUser.getAuthResponse().access_token;
-
-      // Update UI
-      loginButton.innerHTML = '👤 <span>Logged In</span>';
-      loginButton.disabled = true;
-
-      // Send token to backend
-      const authResponse = await fetch(`${BACKEND_URL}/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accessToken }),
-      });
-      if (!authResponse.ok) throw new Error('Auth failed');
-
-      // Fetch emails
-      fetchEmails();
-    } catch (error) {
-      console.error('Login error:', error);
-      const errDiv = document.getElementById('email-error');
-      errDiv.style.display = 'block';
-      errDiv.textContent = 'Failed to sign in. Please try again.';
-    }
-  });
-}
-
-// Fetch emails from backend
+// Fetch Emails from backend
 async function fetchEmails() {
   const emailList = document.getElementById('email-list');
   const emailLoading = document.getElementById('email-loading');
   const emailError = document.getElementById('email-error');
+
   emailLoading.style.display = 'block';
   emailError.style.display = 'none';
 
   try {
-    const response = await fetch(`${BACKEND_URL}/fetch_emails`, {
+    const res = await fetch(`${BACKEND_URL}/fetch_emails`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-    if (!response.ok) throw new Error('Fetch emails failed');
 
-    const emails = await response.json();
+    if (!res.ok) throw new Error("Email fetch failed");
+
+    const emails = await res.json();
     emailList.innerHTML = '';
 
     emails.forEach(email => {
-      const emailItem = document.createElement('div');
-      emailItem.className = 'email-item';
-      emailItem.textContent = email.subject || 'No Subject';
-      emailItem.addEventListener('click', () => fetchEvents(email.id));
-      emailList.appendChild(emailItem);
+      const div = document.createElement('div');
+      div.className = 'email-item';
+      div.textContent = email.subject || 'No Subject';
+      div.addEventListener('click', () => fetchEvents(email.id));
+      emailList.appendChild(div);
     });
-  } catch (error) {
-    console.error('Fetch emails error:', error);
+
+  } catch (err) {
+    console.error(err);
     emailError.style.display = 'block';
-    emailError.textContent = 'Error fetching emails.';
+    emailError.textContent = 'Failed to fetch emails.';
   } finally {
     emailLoading.style.display = 'none';
   }
 }
 
-// Fetch events from backend for selected email
+// Process single email and extract events
 async function fetchEvents(emailId) {
   const eventsList = document.getElementById('events-list');
   const eventsLoading = document.getElementById('events-loading');
   const eventsError = document.getElementById('events-error');
+
   eventsLoading.style.display = 'block';
   eventsError.style.display = 'none';
 
   try {
-    const response = await fetch(`${BACKEND_URL}/process_emails`, {
+    const res = await fetch(`${BACKEND_URL}/process_emails`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -110,9 +111,10 @@ async function fetchEvents(emailId) {
       },
       body: JSON.stringify({ emailId }),
     });
-    if (!response.ok) throw new Error('Event extraction failed');
 
-    const events = await response.json();
+    if (!res.ok) throw new Error("Event extraction failed");
+
+    const events = await res.json();
     eventsList.innerHTML = '';
 
     events.forEach(event => {
@@ -130,8 +132,9 @@ async function fetchEvents(emailId) {
     });
 
     updateSummary(events);
-  } catch (error) {
-    console.error('Fetch events error:', error);
+
+  } catch (err) {
+    console.error(err);
     eventsError.style.display = 'block';
     eventsError.textContent = 'No events found for this email.';
   } finally {
@@ -139,44 +142,44 @@ async function fetchEvents(emailId) {
   }
 }
 
-// Update the event summary section
+// Update summary counts
 function updateSummary(events) {
-  const totalEvents = events.length;
+  const total = events.length;
   const today = new Date();
   const weekStart = new Date(today);
   weekStart.setDate(today.getDate() - today.getDay());
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);
 
-  const thisWeekEvents = events.filter(event => {
-    const eventDate = new Date(event.date);
-    return eventDate >= weekStart && eventDate <= weekEnd;
+  const thisWeek = events.filter(ev => {
+    const dt = new Date(ev.date);
+    return dt >= weekStart && dt <= weekEnd;
   }).length;
 
-  const totalAttendees = events.reduce((sum, event) => sum + (parseInt(event.attendees) || 0), 0);
+  const attendees = events.reduce((sum, ev) => sum + (parseInt(ev.attendees) || 0), 0);
 
-  document.getElementById('total-events').textContent = totalEvents;
-  document.getElementById('this-week-events').textContent = thisWeekEvents;
-  document.getElementById('total-attendees').textContent = totalAttendees;
-  document.getElementById('upcoming-count').textContent = totalEvents;
+  document.getElementById('total-events').textContent = total;
+  document.getElementById('this-week-events').textContent = thisWeek;
+  document.getElementById('total-attendees').textContent = attendees;
+  document.getElementById('upcoming-count').textContent = total;
   document.getElementById('attended-count').textContent = 0;
   document.getElementById('missed-count').textContent = 0;
 }
 
 // Search events
 function setupSearch() {
-  const searchInput = document.getElementById('search-events');
-  searchInput.addEventListener('input', (e) => {
-    const searchTerm = e.target.value.toLowerCase();
+  const input = document.getElementById('search-events');
+  input.addEventListener('input', (e) => {
+    const val = e.target.value.toLowerCase();
     const cards = document.querySelectorAll('.events .card');
-    cards.forEach(card => {
-      const title = card.querySelector('h2').textContent.toLowerCase();
-      card.style.display = title.includes(searchTerm) ? 'block' : 'none';
+    cards.forEach(c => {
+      const title = c.querySelector('h2').textContent.toLowerCase();
+      c.style.display = title.includes(val) ? 'block' : 'none';
     });
   });
 }
 
-// DOM Ready: Init auth and search
+// DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
   initGoogleAuth();
   setupSearch();
