@@ -17,7 +17,7 @@ function handleCredentialResponse(response) {
   fetch(`${BACKEND_URL}/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ accessToken: jwt }),
+    body: JSON.stringify({ token: jwt }),
   })
     .then((res) => {
       if (!res.ok) throw new Error("Token verification failed");
