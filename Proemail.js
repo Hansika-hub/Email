@@ -9,23 +9,33 @@ function toggleSidebar() {
 const BACKEND_URL = "https://email-backend-bu9l.onrender.com";
 let accessToken = null;
 
-// Handle login success
+// Handle ID token and then get Gmail access token
 function handleCredentialResponse(response) {
-  const jwt = response.credential;
-  console.log("JWT received:", jwt);
+  const idToken = response.credential;
 
   fetch(`${BACKEND_URL}/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token: jwt }),
+    body: JSON.stringify({ token: idToken }),
   })
     .then((res) => {
       if (!res.ok) throw new Error("Token verification failed");
       return res.json();
     })
-    .then((data) => {
-      accessToken = data.accessToken;
-      fetchEmails();
+    .then(() => {
+      // Now get Gmail access token
+      gapi.load('client:auth2', () => {
+        gapi.auth2.init({
+          client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
+          scope: "https://www.googleapis.com/auth/gmail.readonly",
+        }).then(() => {
+          const GoogleAuth = gapi.auth2.getAuthInstance();
+          GoogleAuth.signIn().then((googleUser) => {
+            accessToken = googleUser.getAuthResponse().access_token;
+            fetchEmails();
+          });
+        });
+      });
     })
     .catch((err) => {
       console.error("Login error:", err);
@@ -159,7 +169,6 @@ window.onload = function () {
     google.accounts.id.initialize({
       client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
       callback: handleCredentialResponse,
-      scope: "https://www.googleapis.com/auth/gmail.readonly", // Required for Gmail API
       auto_select: false,
       cancel_on_tap_outside: true,
     });
@@ -175,13 +184,13 @@ window.onload = function () {
     google.accounts.id.renderButton(loginButton, {
       theme: "outline",
       size: "large",
-      width: 300, // Optional: Adjust button width for better UI
+      width: 300,
     });
 
-    google.accounts.id.prompt(); // Auto-prompt for sign-in
+    google.accounts.id.prompt(); // Optional prompt
   } catch (err) {
-    console.error("GSI Initialization or Button Rendering failed:", err);
+    console.error("GSI Initialization failed:", err);
     document.getElementById("email-error").style.display = "block";
-    document.getElementById("email-error").textContent = "Failed to initialize Google Sign-In. Ensure the origin is authorized in Google Cloud Console.";
+    document.getElementById("email-error").textContent = "Google Sign-In init failed.";
   }
 };
