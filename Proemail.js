@@ -155,13 +155,33 @@ function setupSearch() {
 
 window.onload = function () {
   setupSearch();
-  google.accounts.id.initialize({
-    client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
-    callback: handleCredentialResponse,
-  });
+  try {
+    google.accounts.id.initialize({
+      client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
+      callback: handleCredentialResponse,
+      scope: "https://www.googleapis.com/auth/gmail.readonly", // Required for Gmail API
+      auto_select: false,
+      cancel_on_tap_outside: true,
+    });
 
-  google.accounts.id.renderButton(
-    document.getElementById("login-button"),
-    { theme: "outline", size: "large" }
-  );
+    const loginButton = document.getElementById("login-button");
+    if (!loginButton) {
+      console.error("Login button element not found");
+      document.getElementById("email-error").style.display = "block";
+      document.getElementById("email-error").textContent = "Login button not found.";
+      return;
+    }
+
+    google.accounts.id.renderButton(loginButton, {
+      theme: "outline",
+      size: "large",
+      width: 300, // Optional: Adjust button width for better UI
+    });
+
+    google.accounts.id.prompt(); // Auto-prompt for sign-in
+  } catch (err) {
+    console.error("GSI Initialization or Button Rendering failed:", err);
+    document.getElementById("email-error").style.display = "block";
+    document.getElementById("email-error").textContent = "Failed to initialize Google Sign-In. Ensure the origin is authorized in Google Cloud Console.";
+  }
 };
