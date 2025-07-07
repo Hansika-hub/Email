@@ -1,44 +1,40 @@
 // Sidebar toggle
 function toggleSidebar() {
-  const sidebar = document.getElementById('sidebar');
-  const overlay = document.getElementById('overlay');
-  sidebar.classList.toggle('open');
-  overlay.classList.toggle('show');
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('overlay').classList.toggle('show');
 }
 
 const BACKEND_URL = "https://email-backend-bu9l.onrender.com";
 let accessToken = null;
 
-// Handle ID token and then get Gmail access token
+// Handle login success (from Google One Tap or button)
 function handleCredentialResponse(response) {
   const idToken = response.credential;
 
+  // Step 1: Send ID token to backend
   fetch(`${BACKEND_URL}/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ token: idToken }),
   })
     .then((res) => {
-      if (!res.ok) throw new Error("Token verification failed");
+      if (!res.ok) throw new Error("ID token verification failed");
       return res.json();
     })
     .then(() => {
-      // Now get Gmail access token
-      gapi.load('client:auth2', () => {
-        gapi.auth2.init({
-          client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
-          scope: "https://www.googleapis.com/auth/gmail.readonly",
-        }).then(() => {
-          const GoogleAuth = gapi.auth2.getAuthInstance();
-          GoogleAuth.signIn().then((googleUser) => {
-            accessToken = googleUser.getAuthResponse().access_token;
-            fetchEmails();
-          });
-        });
-      });
+      // Step 2: Request access token with OAuth scope
+      google.accounts.oauth2.initTokenClient({
+        client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
+        scope: "https://www.googleapis.com/auth/gmail.readonly",
+        callback: (tokenResponse) => {
+          if (tokenResponse.error) throw new Error("Access token error");
+          accessToken = tokenResponse.access_token;
+          fetchEmails();
+        },
+      }).requestAccessToken();
     })
     .catch((err) => {
-      console.error("Login error:", err);
+      console.error("Login failed:", err);
       const errBox = document.getElementById("email-error");
       errBox.style.display = "block";
       errBox.textContent = "Login failed. Try again.";
@@ -80,7 +76,7 @@ async function fetchEmails() {
   }
 }
 
-// Process single email and extract events
+// Extract events from a selected email
 async function fetchEvents(emailId) {
   const eventsList = document.getElementById("events-list");
   const eventsLoading = document.getElementById("events-loading");
@@ -128,6 +124,7 @@ async function fetchEvents(emailId) {
   }
 }
 
+// Update event dashboard
 function updateSummary(events) {
   const total = events.length;
   const today = new Date();
@@ -151,6 +148,7 @@ function updateSummary(events) {
   document.getElementById("missed-count").textContent = 0;
 }
 
+// Search event cards
 function setupSearch() {
   const input = document.getElementById("search-events");
   input.addEventListener("input", (e) => {
@@ -163,14 +161,17 @@ function setupSearch() {
   });
 }
 
+// Init Google Sign-In & render button
 window.onload = function () {
   setupSearch();
+
   try {
     google.accounts.id.initialize({
       client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
       callback: handleCredentialResponse,
       auto_select: false,
       cancel_on_tap_outside: true,
+      itp_support: true,
     });
 
     const loginButton = document.getElementById("login-button");
@@ -187,7 +188,8 @@ window.onload = function () {
       width: 300,
     });
 
-    google.accounts.id.prompt(); // Optional prompt
+    // Optional: Show One Tap
+    google.accounts.id.prompt();
   } catch (err) {
     console.error("GSI Initialization failed:", err);
     document.getElementById("email-error").style.display = "block";
