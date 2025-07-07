@@ -1,16 +1,4 @@
 {
-  "builds": [
-    {
-      "src": "index.html",
-      "use": "@vercel/static"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
-  ],
   "headers": [
     {
       "source": "/(.*)",
@@ -21,7 +9,7 @@
         },
         {
           "key": "Cross-Origin-Embedder-Policy",
-          "value": "unsafe-none" 
+          "value": "unsafe-none"
         },
         {
           "key": "Content-Security-Policy",
