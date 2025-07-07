@@ -5,11 +5,11 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com https://apis.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://accounts.google.com https://www.googleapis.com https://email-backend-bu9l.onrender.com; frame-src https://accounts.google.com https://*.gstatic.com; img-src 'self' data: https://www.gstatic.com https://*.googleusercontent.com;"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data: https://accounts.google.com https://apis.google.com https://www.gstatic.com; connect-src 'self' https://accounts.google.com https://www.googleapis.com https://email-backend-bu9l.onrender.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; frame-src https://accounts.google.com https://*.gstatic.com; img-src 'self' data: https://www.gstatic.com https://*.googleusercontent.com;"
         },
         {
           "key": "Cross-Origin-Opener-Policy",
-          "value": "same-origin-allow-popups"
+          "value": "same-origin"
         },
         {
           "key": "Cross-Origin-Embedder-Policy",
