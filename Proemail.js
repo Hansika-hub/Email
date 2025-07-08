@@ -109,7 +109,6 @@ async function fetchEvents(emailId) {
         <p>📅 ${event.date || 'N/A'}</p>
         <p>⏰ ${event.time || 'N/A'}</p>
         <p>📍 ${event.venue || 'N/A'}</p>
-        <p>👥 ${event.attendees || 0} attendees</p>
       `;
       eventsList.appendChild(card);
     });
