@@ -1,5 +1,3 @@
-// ✅ FIXED + ENHANCED Proemail.js
-
 // Sidebar toggle
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
@@ -13,7 +11,8 @@ let accessToken = null;
 function handleCredentialResponse(response) {
   const idToken = response.credential;
 
-  fetch(`${BACKEND_URL}/`, {
+  // Step 1: Send ID token to backend
+  fetch(${BACKEND_URL}/, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ token: idToken }),
@@ -23,6 +22,7 @@ function handleCredentialResponse(response) {
       return res.json();
     })
     .then(() => {
+      // Step 2: Request access token with OAuth scope
       google.accounts.oauth2.initTokenClient({
         client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
         scope: "https://www.googleapis.com/auth/gmail.readonly",
@@ -36,10 +36,8 @@ function handleCredentialResponse(response) {
     .catch((err) => {
       console.error("Login failed:", err);
       const errBox = document.getElementById("email-error");
-      if (errBox) {
-        errBox.style.display = "block";
-        errBox.textContent = "Login failed. Try again.";
-      }
+      errBox.style.display = "block";
+      errBox.textContent = "Login failed. Try again.";
     });
 }
 
@@ -49,14 +47,12 @@ async function fetchEmails() {
   const emailLoading = document.getElementById("email-loading");
   const emailError = document.getElementById("email-error");
 
-  if (!emailList || !emailLoading || !emailError) return;
-
   emailLoading.style.display = "block";
   emailError.style.display = "none";
 
   try {
-    const res = await fetch(`${BACKEND_URL}/fetch_emails`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
+    const res = await fetch(${BACKEND_URL}/fetch_emails, {
+      headers: { Authorization: Bearer ${accessToken} },
     });
 
     if (!res.ok) throw new Error("Email fetch failed");
@@ -86,17 +82,15 @@ async function fetchEvents(emailId) {
   const eventsLoading = document.getElementById("events-loading");
   const eventsError = document.getElementById("events-error");
 
-  if (!eventsList || !eventsLoading || !eventsError) return;
-
   eventsLoading.style.display = "block";
   eventsError.style.display = "none";
 
   try {
-    const res = await fetch(`${BACKEND_URL}/process_emails`, {
+    const res = await fetch(${BACKEND_URL}/process_emails, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: Bearer ${accessToken},
       },
       body: JSON.stringify({ emailId }),
     });
@@ -106,22 +100,16 @@ async function fetchEvents(emailId) {
     const events = await res.json();
     eventsList.innerHTML = "";
 
-    if (!events.length) {
-      eventsError.style.display = "block";
-      eventsError.textContent = "No events found for this email.";
-      return;
-    }
-
     events.forEach((event) => {
       const card = document.createElement("div");
       card.className = "card";
-      card.innerHTML = `
+      card.innerHTML = 
         <div style="color: #8b5cf6; font-weight: bold;">${event.type || 'Event'}</div>
         <h2>${event.event_name || 'No Title'}</h2>
         <p>📅 ${event.date || 'N/A'}</p>
         <p>⏰ ${event.time || 'N/A'}</p>
         <p>📍 ${event.venue || 'N/A'}</p>
-      `;
+      ;
       eventsList.appendChild(card);
     });
 
@@ -159,18 +147,20 @@ function updateSummary(events) {
   document.getElementById("missed-count").textContent = 0;
 }
 
+// Search event cards
 function setupSearch() {
   const input = document.getElementById("search-events");
-  input?.addEventListener("input", (e) => {
+  input.addEventListener("input", (e) => {
     const val = e.target.value.toLowerCase();
     const cards = document.querySelectorAll(".events .card");
     cards.forEach((c) => {
-      const title = c.querySelector("h2")?.textContent?.toLowerCase() || "";
+      const title = c.querySelector("h2").textContent.toLowerCase();
       c.style.display = title.includes(val) ? "block" : "none";
     });
   });
 }
 
+// Init Google Sign-In & render button
 window.onload = function () {
   setupSearch();
 
@@ -186,11 +176,8 @@ window.onload = function () {
     const loginButton = document.getElementById("login-button");
     if (!loginButton) {
       console.error("Login button element not found");
-      const errBox = document.getElementById("email-error");
-      if (errBox) {
-        errBox.style.display = "block";
-        errBox.textContent = "Login button not found.";
-      }
+      document.getElementById("email-error").style.display = "block";
+      document.getElementById("email-error").textContent = "Login button not found.";
       return;
     }
 
@@ -200,13 +187,10 @@ window.onload = function () {
       width: 300,
     });
 
+    // Optional: Show One Tap
     google.accounts.id.prompt();
   } catch (err) {
     console.error("GSI Initialization failed:", err);
-    const errBox = document.getElementById("email-error");
-    if (errBox) {
-      errBox.style.display = "block";
-      errBox.textContent = "Google Sign-In init failed.";
-    }
+    document.getElementById("email-error").style.display = "block";
+    document.getElementById("email-error").textContent = "Google Sign-In init failed.";
   }
-};
