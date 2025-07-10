@@ -1,16 +1,17 @@
 // Sidebar toggle
 function toggleSidebar() {
-  document.getElementById('sidebar').classList.toggle('open');
-  document.getElementById('overlay').classList.toggle('show');
+  document.getElementById("sidebar").classList.toggle("open");
+  document.getElementById("overlay").classList.toggle("show");
 }
 
 const BACKEND_URL = "https://email-backend-bu9l.onrender.com";
 let accessToken = null;
 
-// Handle login success
+// Handle login success (from Google One Tap or button)
 function handleCredentialResponse(response) {
   const idToken = response.credential;
 
+  // Step 1: Send ID token to backend
   fetch(`${BACKEND_URL}/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -21,15 +22,19 @@ function handleCredentialResponse(response) {
       return res.json();
     })
     .then(() => {
-      google.accounts.oauth2.initTokenClient({
-        client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
-        scope: "https://www.googleapis.com/auth/gmail.readonly",
-        callback: (tokenResponse) => {
-          if (tokenResponse.error) throw new Error("Access token error");
-          accessToken = tokenResponse.access_token;
-          fetchEmails();
-        },
-      }).requestAccessToken();
+      // Step 2: Request access token with OAuth scope
+      google.accounts.oauth2
+        .initTokenClient({
+          client_id:
+            "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
+          scope: "https://www.googleapis.com/auth/gmail.readonly",
+          callback: (tokenResponse) => {
+            if (tokenResponse.error) throw new Error("Access token error");
+            accessToken = tokenResponse.access_token;
+            fetchEmails();
+          },
+        })
+        .requestAccessToken();
     })
     .catch((err) => {
       console.error("Login failed:", err);
@@ -39,7 +44,7 @@ function handleCredentialResponse(response) {
     });
 }
 
-// Fetch Emails
+// Fetch Emails from backend
 async function fetchEmails() {
   const emailList = document.getElementById("email-list");
   const emailLoading = document.getElementById("email-loading");
@@ -74,7 +79,7 @@ async function fetchEmails() {
   }
 }
 
-// Extract events
+// Extract events from a selected email
 async function fetchEvents(emailId) {
   const eventsList = document.getElementById("events-list");
   const eventsLoading = document.getElementById("events-loading");
@@ -96,27 +101,17 @@ async function fetchEvents(emailId) {
     if (!res.ok) throw new Error("Event extraction failed");
 
     const events = await res.json();
-    console.log("✅ Extracted Events:", events);  // Debug log
     eventsList.innerHTML = "";
 
-    if (!Array.isArray(events) || events.length === 0) {
-      eventsError.style.display = "block";
-      eventsError.textContent = "No events found for this email.";
-      return;
-    }
-
     events.forEach((event) => {
-      // Handle case where nothing was extracted
-      if (!event.event_name && !event.date && !event.time && !event.venue) return;
-
       const card = document.createElement("div");
       card.className = "card";
       card.innerHTML = `
-        <div style="color: #8b5cf6; font-weight: bold;">${event.type || 'Event'}</div>
-        <h2>${event.event_name || 'No Title'}</h2>
-        <p>📅 ${event.date || 'N/A'}</p>
-        <p>⏰ ${event.time || 'N/A'}</p>
-        <p>📍 ${event.venue || 'N/A'}</p>
+        <div style="color: #8b5cf6; font-weight: bold;">${event.type || "Event"}</div>
+        <h2>${event.event_name || "No Title"}</h2>
+        <p>📅 ${event.date || "N/A"}</p>
+        <p>⏰ ${event.time || "N/A"}</p>
+        <p>📍 ${event.venue || "N/A"}</p>
       `;
       eventsList.appendChild(card);
     });
@@ -131,7 +126,7 @@ async function fetchEvents(emailId) {
   }
 }
 
-// Summary updater
+// Update event dashboard
 function updateSummary(events) {
   const total = events.length;
   const today = new Date();
@@ -145,7 +140,10 @@ function updateSummary(events) {
     return dt >= weekStart && dt <= weekEnd;
   }).length;
 
-  const attendees = events.reduce((sum, ev) => sum + (parseInt(ev.attendees) || 0), 0);
+  const attendees = events.reduce(
+    (sum, ev) => sum + (parseInt(ev.attendees) || 0),
+    0
+  );
 
   document.getElementById("total-events").textContent = total;
   document.getElementById("this-week-events").textContent = thisWeek;
@@ -155,7 +153,7 @@ function updateSummary(events) {
   document.getElementById("missed-count").textContent = 0;
 }
 
-// Search
+// Search event cards
 function setupSearch() {
   const input = document.getElementById("search-events");
   input.addEventListener("input", (e) => {
@@ -168,13 +166,14 @@ function setupSearch() {
   });
 }
 
-// Init
+// Init Google Sign-In & render button
 window.onload = function () {
   setupSearch();
 
   try {
     google.accounts.id.initialize({
-      client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
+      client_id:
+        "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
       callback: handleCredentialResponse,
       auto_select: false,
       cancel_on_tap_outside: true,
@@ -185,7 +184,8 @@ window.onload = function () {
     if (!loginButton) {
       console.error("Login button element not found");
       document.getElementById("email-error").style.display = "block";
-      document.getElementById("email-error").textContent = "Login button not found.";
+      document.getElementById("email-error").textContent =
+        "Login button not found.";
       return;
     }
 
@@ -195,10 +195,12 @@ window.onload = function () {
       width: 300,
     });
 
+    // Optional: Show One Tap
     google.accounts.id.prompt();
   } catch (err) {
     console.error("GSI Initialization failed:", err);
     document.getElementById("email-error").style.display = "block";
-    document.getElementById("email-error").textContent = "Google Sign-In init failed.";
+    document.getElementById("email-error").textContent =
+      "Google Sign-In init failed.";
   }
 };
