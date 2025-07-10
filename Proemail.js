@@ -5,89 +5,90 @@ function toggleSidebar() {
 }
 
 const BACKEND_URL = "https://email-backend-bu9l.onrender.com";
-let accessToken = null;
+let accessToken = localStorage.getItem("accessToken") || null;
 
-// Handle login success (from Google One Tap or button)
+// On load, fetch events if already logged in
+window.onload = function () {
+  setupSearch();
+
+  if (accessToken) {
+    fetchAllUnreadEmails();
+  }
+
+  try {
+    google.accounts.id.initialize({
+      client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
+      callback: handleCredentialResponse,
+      auto_select: true,
+      cancel_on_tap_outside: true,
+      itp_support: true,
+    });
+
+    const loginButton = document.getElementById("login-button");
+    if (loginButton) {
+      google.accounts.id.renderButton(loginButton, {
+        theme: "outline",
+        size: "large",
+        width: 300,
+      });
+      google.accounts.id.prompt(); // optional One Tap
+    }
+  } catch (err) {
+    console.error("GSI Initialization failed:", err);
+    showError("Google Sign-In init failed.");
+  }
+};
+
+// Handle Google Login
 function handleCredentialResponse(response) {
   const idToken = response.credential;
 
-  // Step 1: Send ID token to backend
   fetch(`${BACKEND_URL}/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ token: idToken }),
   })
-    .then((res) => {
-      if (!res.ok) throw new Error("ID token verification failed");
-      return res.json();
-    })
+    .then((res) => res.json())
     .then(() => {
-      // Step 2: Request access token with OAuth scope
-      google.accounts.oauth2
-        .initTokenClient({
-          client_id:
-            "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
-          scope: "https://www.googleapis.com/auth/gmail.readonly",
-          callback: (tokenResponse) => {
-            if (tokenResponse.error) throw new Error("Access token error");
-            accessToken = tokenResponse.access_token;
-            fetchEmails();
-          },
-        })
-        .requestAccessToken();
+      google.accounts.oauth2.initTokenClient({
+        client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
+        scope: "https://www.googleapis.com/auth/gmail.readonly",
+        callback: (tokenResponse) => {
+          accessToken = tokenResponse.access_token;
+          localStorage.setItem("accessToken", accessToken);
+          fetchAllUnreadEmails();
+        },
+      }).requestAccessToken();
     })
     .catch((err) => {
       console.error("Login failed:", err);
-      const errBox = document.getElementById("email-error");
-      errBox.style.display = "block";
-      errBox.textContent = "Login failed. Try again.";
+      showError("Login failed. Try again.");
     });
 }
 
-// Fetch Emails from backend
-async function fetchEmails() {
-  const emailList = document.getElementById("email-list");
-  const emailLoading = document.getElementById("email-loading");
-  const emailError = document.getElementById("email-error");
-
-  emailLoading.style.display = "block";
-  emailError.style.display = "none";
-
+// Fetch all unread emails and extract events
+async function fetchAllUnreadEmails() {
   try {
     const res = await fetch(`${BACKEND_URL}/fetch_emails`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-
-    if (!res.ok) throw new Error("Email fetch failed");
-
     const emails = await res.json();
-    emailList.innerHTML = "";
 
-    emails.forEach((email) => {
-      const div = document.createElement("div");
-      div.className = "email-item";
-      div.textContent = email.subject || "No Subject";
-      div.addEventListener("click", () => fetchEvents(email.id));
-      emailList.appendChild(div);
-    });
+    const promises = emails.map((email) => fetchEvents(email.id));
+    const results = await Promise.all(promises);
+    const allEvents = results.flat().filter(ev => ev);
+
+    renderEvents(allEvents);
+    updateSummary(allEvents);
+    scheduleNotifications(allEvents);
   } catch (err) {
-    console.error(err);
-    emailError.style.display = "block";
-    emailError.textContent = "Failed to fetch emails.";
-  } finally {
-    emailLoading.style.display = "none";
+    console.error("Fetching emails failed:", err);
+    showError("Failed to fetch emails.");
   }
 }
 
-// Extract events from a selected email
+// Extract events from one email
 async function fetchEvents(emailId) {
-  const eventsList = document.getElementById("events-list");
-  const eventsLoading = document.getElementById("events-loading");
-  const eventsError = document.getElementById("events-error");
-
-  eventsLoading.style.display = "block";
-  eventsError.style.display = "none";
-
   try {
     const res = await fetch(`${BACKEND_URL}/process_emails`, {
       method: "POST",
@@ -98,62 +99,67 @@ async function fetchEvents(emailId) {
       body: JSON.stringify({ emailId }),
     });
 
-    if (!res.ok) throw new Error("Event extraction failed");
+    if (!res.ok) return [];
 
-    const events = await res.json();
-    eventsList.innerHTML = "";
-
-    events.forEach((event) => {
-      const card = document.createElement("div");
-      card.className = "card";
-      card.innerHTML = `
-        <div style="color: #8b5cf6; font-weight: bold;">${event.type || "Event"}</div>
-        <h2>${event.event_name || "No Title"}</h2>
-        <p>📅 ${event.date || "N/A"}</p>
-        <p>⏰ ${event.time || "N/A"}</p>
-        <p>📍 ${event.venue || "N/A"}</p>
-      `;
-      eventsList.appendChild(card);
-    });
-
-    updateSummary(events);
+    return await res.json();
   } catch (err) {
-    console.error(err);
-    eventsError.style.display = "block";
-    eventsError.textContent = "No events found for this email.";
-  } finally {
-    eventsLoading.style.display = "none";
+    console.error(`Error processing email ${emailId}:`, err);
+    return [];
   }
 }
 
-// Update event dashboard
-function updateSummary(events) {
-  const total = events.length;
-  const today = new Date();
-  const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - today.getDay());
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 6);
+// Render events with checkbox
+function renderEvents(events) {
+  const list = document.getElementById("events-list");
+  list.innerHTML = "";
 
-  const thisWeek = events.filter((ev) => {
-    const dt = new Date(ev.date);
-    return dt >= weekStart && dt <= weekEnd;
-  }).length;
+  const now = new Date();
+  const upcoming = [];
+  const completed = JSON.parse(localStorage.getItem("completedEvents") || "[]");
+  const missed = [];
 
-  const attendees = events.reduce(
-    (sum, ev) => sum + (parseInt(ev.attendees) || 0),
-    0
-  );
+  events.forEach((event) => {
+    const dateStr = `${event.date || ""} ${event.time || ""}`;
+    const eventTime = new Date(dateStr);
+    const isCompleted = completed.includes(event.event_name);
 
-  document.getElementById("total-events").textContent = total;
-  document.getElementById("this-week-events").textContent = thisWeek;
-  document.getElementById("total-attendees").textContent = attendees;
-  document.getElementById("upcoming-count").textContent = total;
-  document.getElementById("attended-count").textContent = 0;
-  document.getElementById("missed-count").textContent = 0;
+    let category = "upcoming";
+    if (isCompleted) category = "completed";
+    else if (eventTime < now) category = "missed";
+    else upcoming.push(event);
+
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = isCompleted;
+    checkbox.addEventListener("change", () => handleStatusChange(event, checkbox.checked));
+
+    card.innerHTML = `
+      <div style="color: #8b5cf6; font-weight: bold;">${event.type || "Event"}</div>
+      <h2>${event.event_name || "No Title"}</h2>
+      <p>📅 ${event.date || "N/A"}</p>
+      <p>⏰ ${event.time || "N/A"}</p>
+      <p>📍 ${event.venue || "N/A"}</p>
+    `;
+
+    card.prepend(checkbox);
+    list.appendChild(card);
+  });
 }
 
-// Search event cards
+// Handle marking event as complete
+function handleStatusChange(event, isComplete) {
+  const completed = new Set(JSON.parse(localStorage.getItem("completedEvents") || "[]"));
+  if (isComplete) completed.add(event.event_name);
+  else completed.delete(event.event_name);
+
+  localStorage.setItem("completedEvents", JSON.stringify([...completed]));
+  fetchAllUnreadEmails(); // re-render everything
+}
+
+// Setup event search
 function setupSearch() {
   const input = document.getElementById("search-events");
   input.addEventListener("input", (e) => {
@@ -166,41 +172,66 @@ function setupSearch() {
   });
 }
 
-// Init Google Sign-In & render button
-window.onload = function () {
-  setupSearch();
+// Notification scheduler
+function scheduleNotifications(events) {
+  if (!("Notification" in window)) return;
 
-  try {
-    google.accounts.id.initialize({
-      client_id:
-        "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
-      callback: handleCredentialResponse,
-      auto_select: false,
-      cancel_on_tap_outside: true,
-      itp_support: true,
+  Notification.requestPermission().then((permission) => {
+    if (permission !== "granted") return;
+
+    events.forEach((event) => {
+      const dateTimeStr = `${event.date} ${event.time}`;
+      const eventTime = new Date(dateTimeStr);
+      const now = new Date();
+
+      const times = [60, 15, 5]; // minutes before
+      times.forEach((min) => {
+        const delay = eventTime - now - min * 60 * 1000;
+        if (delay > 0) {
+          setTimeout(() => {
+            new Notification(`Upcoming Event: ${event.event_name}`, {
+              body: `📍 ${event.venue || "Unknown"}\n⏰ ${event.time || "Unknown"}`,
+              icon: "/favicon.png",
+            });
+          }, delay);
+        }
+      });
     });
+  });
+}
 
-    const loginButton = document.getElementById("login-button");
-    if (!loginButton) {
-      console.error("Login button element not found");
-      document.getElementById("email-error").style.display = "block";
-      document.getElementById("email-error").textContent =
-        "Login button not found.";
-      return;
-    }
+// Update dashboard summary
+function updateSummary(events) {
+  const today = new Date();
+  const weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - today.getDay());
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
 
-    google.accounts.id.renderButton(loginButton, {
-      theme: "outline",
-      size: "large",
-      width: 300,
-    });
+  const total = events.length;
+  const thisWeek = events.filter((ev) => {
+    const dt = new Date(`${ev.date} ${ev.time}`);
+    return dt >= weekStart && dt <= weekEnd;
+  }).length;
 
-    // Optional: Show One Tap
-    google.accounts.id.prompt();
-  } catch (err) {
-    console.error("GSI Initialization failed:", err);
-    document.getElementById("email-error").style.display = "block";
-    document.getElementById("email-error").textContent =
-      "Google Sign-In init failed.";
-  }
-};
+  const completed = JSON.parse(localStorage.getItem("completedEvents") || "[]").length;
+  const missed = events.filter((ev) => {
+    const dt = new Date(`${ev.date} ${ev.time}`);
+    return dt < today && !completed.includes(ev.event_name);
+  }).length;
+  const upcoming = total - completed - missed;
+
+  document.getElementById("total-events").textContent = total;
+  document.getElementById("this-week-events").textContent = thisWeek;
+  document.getElementById("total-attendees").textContent = total;
+  document.getElementById("upcoming-count").textContent = upcoming;
+  document.getElementById("attended-count").textContent = completed;
+  document.getElementById("missed-count").textContent = missed;
+}
+
+// Error handler
+function showError(message) {
+  const errBox = document.getElementById("email-error");
+  errBox.style.display = "block";
+  errBox.textContent = message;
+}
