@@ -70,11 +70,16 @@ async function fetchEmails() {
   eventsList.innerHTML = ""; // Clear previous events
 
   try {
-    const res = await fetch(`${BACKEND_URL}/fetch_emails`, {
+     const res = await fetch(`${BACKEND_URL}/fetch_emails`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
+    
+    if (!res.ok) {
+      const errorText = await res.text();  // Detailed error from backend
+      console.error("❌ Fetch Emails failed:", res.status, errorText);
+      throw new Error("Email fetch failed");
+    }
 
-    if (!res.ok) throw new Error("Email fetch failed");
 
     const emails = await res.json();
     emailList.innerHTML = "";
