@@ -10,11 +10,6 @@ let accessToken = null;
 // Handle login success (from Google One Tap or button)
 function handleCredentialResponse(response) {
   const idToken = response.credential;
-  const payload = JSON.parse(atob(idToken.split('.')[1]));
-  const email = payload.email;
-
-// Save for revoking later
-localStorage.setItem("userEmail", email);
 
   // Step 1: Send ID token to backend
   fetch(`${BACKEND_URL}/`, {
@@ -27,7 +22,7 @@ localStorage.setItem("userEmail", email);
       return res.json();
     })
     .then(() => {
-      // Step 2: Request Gmail access token
+      // Step 2: Request access token with OAuth scope
       google.accounts.oauth2
         .initTokenClient({
           client_id:
@@ -36,14 +31,6 @@ localStorage.setItem("userEmail", email);
           callback: (tokenResponse) => {
             if (tokenResponse.error) throw new Error("Access token error");
             accessToken = tokenResponse.access_token;
-
-            // ✅ Save token to localStorage
-            localStorage.setItem("accessToken", accessToken);
-
-            // ✅ Update UI
-            showLogout();
-
-            // ✅ Proceed to fetch emails
             fetchEmails();
           },
         })
@@ -56,7 +43,6 @@ localStorage.setItem("userEmail", email);
       errBox.textContent = "Login failed. Try again.";
     });
 }
-
 
 // Fetch Emails from backend
 async function fetchEmails() {
@@ -184,17 +170,6 @@ function setupSearch() {
 window.onload = function () {
   setupSearch();
 
-  const storedToken = localStorage.getItem("accessToken");
-
-  if (storedToken) {
-    // ✅ Auto-login using saved token
-    accessToken = storedToken;
-    showLogout(); // update UI
-    fetchEmails(); // load events
-    return; // ✅ No need to initialize Google Sign-In again
-  }
-
-  // No token stored — proceed with Google Sign-In button setup
   try {
     google.accounts.id.initialize({
       client_id:
@@ -228,46 +203,4 @@ window.onload = function () {
     document.getElementById("email-error").textContent =
       "Google Sign-In init failed.";
   }
-  document.getElementById("logoutButton").addEventListener("click", function () {
-  console.log("Logout clicked");
-
-  const email = localStorage.getItem("userEmail"); // we’ll save this on login
-  localStorage.removeItem("accessToken");
-  localStorage.removeItem("userEmail");
-  accessToken = null;
-
-  // Clear UI
-  document.getElementById("events-list").innerHTML = "";
-  document.getElementById("email-list").innerHTML = "";
-  document.getElementById("total-events").textContent = 0;
-  document.getElementById("this-week-events").textContent = 0;
-  document.getElementById("total-attendees").textContent = 0;
-  document.getElementById("upcoming-count").textContent = 0;
-  document.getElementById("attended-count").textContent = 0;
-  document.getElementById("missed-count").textContent = 0;
-
-
-  // Hide logout, show login
-  showLogin();
-  google.accounts.id.disableAutoSelect();
-
-  if (email) {
-    google.accounts.id.revoke(email, () => {
-      console.log("Google session revoked");
-    });
-  }
-});
-
 };
-// ✅ Utility UI Functions
-
-function showLogin() {
-  console.log("Showing login");
-  document.getElementById("loginDiv").style.display = "block"; // Or display One Tap again
-  document.getElementById("logoutButton").style.display = "none";
-}
-
-function showLogout() {
-  document.getElementById("loginDiv").style.display = "none";
-  document.getElementById("logoutButton").style.display = "inline-block";
-}
