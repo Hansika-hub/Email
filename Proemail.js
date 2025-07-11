@@ -67,6 +67,7 @@ async function fetchEmails() {
 
   emailLoading.style.display = "block";
   emailError.style.display = "none";
+  eventsList.innerHTML = ""; // Clear previous events
 
   try {
     const res = await fetch(`${BACKEND_URL}/fetch_emails`, {
@@ -77,41 +78,43 @@ async function fetchEmails() {
 
     const emails = await res.json();
     emailList.innerHTML = "";
-    eventsList.innerHTML = ""; // Clear old events
 
     let totalExtractedEvents = [];
+    const maxEmails = 10;
 
-    // Process each email automatically
-    for (const email of emails) {
-      const eventRes = await fetch(`${BACKEND_URL}/process_emails`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ emailId: email.id }),
-      });
+    for (let i = 0; i < Math.min(emails.length, maxEmails); i++) {
+      const email = emails[i];
+      try {
+        const eventRes = await fetch(`${BACKEND_URL}/process_emails`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ emailId: email.id }),
+        });
 
-      if (!eventRes.ok) continue;
+        if (!eventRes.ok) continue;
 
-      const events = await eventRes.json();
+        const events = await eventRes.json();
 
-      // Show only emails with at least 3 non-empty fields
-      const validEvents = events.filter(event => {
-        let count = 0;
-        if (event.event_name) count++;
-        if (event.date) count++;
-        if (event.time) count++;
-        if (event.venue) count++;
-        return count >= 3;
-      });
+        const validEvents = events.filter(event => {
+          let count = 0;
+          if (event.event_name) count++;
+          if (event.date) count++;
+          if (event.time) count++;
+          if (event.venue) count++;
+          return count >= 3;
+        });
 
-      totalExtractedEvents.push(...validEvents);
+        totalExtractedEvents.push(...validEvents);
+      } catch (innerErr) {
+        console.warn("Skipping email due to error:", innerErr);
+      }
     }
 
     displayEventCards(totalExtractedEvents);
     updateSummary(totalExtractedEvents);
-
   } catch (err) {
     console.error(err);
     emailError.style.display = "block";
@@ -120,6 +123,7 @@ async function fetchEmails() {
     emailLoading.style.display = "none";
   }
 }
+
 
 
 // Extract events from a selected email
