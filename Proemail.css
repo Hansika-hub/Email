@@ -154,3 +154,8 @@ footer {
   background: white;
   border-radius: 8px;
 }
+.events {
+  max-height: unset;
+  overflow-y: auto;
+  padding-bottom: 2rem;
+}
