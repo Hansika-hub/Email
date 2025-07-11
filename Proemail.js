@@ -57,6 +57,7 @@ localStorage.setItem("userEmail", email);
     });
 }
 
+
 // Fetch Emails from backend
 async function fetchEmails() {
   const emailList = document.getElementById("email-list");
@@ -166,22 +167,6 @@ function updateSummary(events) {
   document.getElementById("missed-count").textContent = 0;
 }
 
-function displayEventCards(events) {
-  const eventsList = document.getElementById("events-list");
-  events.forEach((event) => {
-    const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `
-      <div style="color: #8b5cf6; font-weight: bold;">${event.type || "Event"}</div>
-      <h2>${event.event_name || "No Title"}</h2>
-      <p>📅 ${event.date || "N/A"}</p>
-      <p>⏰ ${event.time || "N/A"}</p>
-      <p>📍 ${event.venue || "N/A"}</p>
-    `;
-    eventsList.appendChild(card);
-  });
-}
-
 // Search event cards
 function setupSearch() {
   const input = document.getElementById("search-events");
@@ -261,7 +246,10 @@ window.onload = function () {
   document.getElementById("attended-count").textContent = 0;
   document.getElementById("missed-count").textContent = 0;
 
+
+  // Hide logout, show login
   showLogin();
+  google.accounts.id.disableAutoSelect();
 
   if (email) {
     google.accounts.id.revoke(email, () => {
@@ -283,4 +271,3 @@ function showLogout() {
   document.getElementById("loginDiv").style.display = "none";
   document.getElementById("logoutButton").style.display = "inline-block";
 }
-
