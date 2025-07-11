@@ -63,6 +63,7 @@ async function fetchEmails() {
   const emailList = document.getElementById("email-list");
   const emailLoading = document.getElementById("email-loading");
   const emailError = document.getElementById("email-error");
+  const eventsList = document.getElementById("events-list");
 
   emailLoading.style.display = "block";
   emailError.style.display = "none";
@@ -76,22 +77,50 @@ async function fetchEmails() {
 
     const emails = await res.json();
     emailList.innerHTML = "";
+    eventsList.innerHTML = ""; // Clear old events
 
-    emails.forEach((email) => {
-      const div = document.createElement("div");
-      div.className = "email-item";
-      div.textContent = email.subject || "No Subject";
-      div.addEventListener("click", () => fetchEvents(email.id));
-      emailList.appendChild(div);
-    });
+    let totalExtractedEvents = [];
+
+    // Process each email automatically
+    for (const email of emails) {
+      const eventRes = await fetch(`${BACKEND_URL}/process_emails`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ emailId: email.id }),
+      });
+
+      if (!eventRes.ok) continue;
+
+      const events = await eventRes.json();
+
+      // Show only emails with at least 3 non-empty fields
+      const validEvents = events.filter(event => {
+        let count = 0;
+        if (event.event_name) count++;
+        if (event.date) count++;
+        if (event.time) count++;
+        if (event.venue) count++;
+        return count >= 3;
+      });
+
+      totalExtractedEvents.push(...validEvents);
+    }
+
+    displayEventCards(totalExtractedEvents);
+    updateSummary(totalExtractedEvents);
+
   } catch (err) {
     console.error(err);
     emailError.style.display = "block";
-    emailError.textContent = "Failed to fetch emails.";
+    emailError.textContent = "Failed to fetch or process emails.";
   } finally {
     emailLoading.style.display = "none";
   }
 }
+
 
 // Extract events from a selected email
 async function fetchEvents(emailId) {
@@ -165,6 +194,22 @@ function updateSummary(events) {
   document.getElementById("upcoming-count").textContent = total;
   document.getElementById("attended-count").textContent = 0;
   document.getElementById("missed-count").textContent = 0;
+}
+
+function displayEventCards(events) {
+  const eventsList = document.getElementById("events-list");
+  events.forEach((event) => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div style="color: #8b5cf6; font-weight: bold;">${event.type || "Event"}</div>
+      <h2>${event.event_name || "No Title"}</h2>
+      <p>📅 ${event.date || "N/A"}</p>
+      <p>⏰ ${event.time || "N/A"}</p>
+      <p>📍 ${event.venue || "N/A"}</p>
+    `;
+    eventsList.appendChild(card);
+  });
 }
 
 // Search event cards
