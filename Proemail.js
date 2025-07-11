@@ -10,6 +10,11 @@ let accessToken = null;
 // Handle login success (from Google One Tap or button)
 function handleCredentialResponse(response) {
   const idToken = response.credential;
+  const payload = JSON.parse(atob(idToken.split('.')[1]));
+  const email = payload.email;
+
+// Save for revoking later
+localStorage.setItem("userEmail", email);
 
   // Step 1: Send ID token to backend
   fetch(`${BACKEND_URL}/`, {
@@ -225,7 +230,10 @@ window.onload = function () {
   }
   document.getElementById("logoutButton").addEventListener("click", function () {
   console.log("Logout clicked");
+
+  const email = localStorage.getItem("userEmail"); // we’ll save this on login
   localStorage.removeItem("accessToken");
+  localStorage.removeItem("userEmail");
   accessToken = null;
 
   // Clear UI
@@ -238,10 +246,13 @@ window.onload = function () {
   document.getElementById("attended-count").textContent = 0;
   document.getElementById("missed-count").textContent = 0;
 
-
-  // Hide logout, show login
   showLogin();
-  google.accounts.id.disableAutoSelect();
+
+  if (email) {
+    google.accounts.id.revoke(email, () => {
+      console.log("Google session revoked");
+    });
+  }
 });
 
 };
