@@ -22,7 +22,7 @@ function handleCredentialResponse(response) {
       return res.json();
     })
     .then(() => {
-      // Step 2: Request access token with OAuth scope
+      // Step 2: Request Gmail access token
       google.accounts.oauth2
         .initTokenClient({
           client_id:
@@ -31,6 +31,14 @@ function handleCredentialResponse(response) {
           callback: (tokenResponse) => {
             if (tokenResponse.error) throw new Error("Access token error");
             accessToken = tokenResponse.access_token;
+
+            // ✅ Save token to localStorage
+            localStorage.setItem("accessToken", accessToken);
+
+            // ✅ Update UI
+            showLogout();
+
+            // ✅ Proceed to fetch emails
             fetchEmails();
           },
         })
@@ -43,6 +51,7 @@ function handleCredentialResponse(response) {
       errBox.textContent = "Login failed. Try again.";
     });
 }
+
 
 // Fetch Emails from backend
 async function fetchEmails() {
@@ -170,6 +179,17 @@ function setupSearch() {
 window.onload = function () {
   setupSearch();
 
+  const storedToken = localStorage.getItem("accessToken");
+
+  if (storedToken) {
+    // ✅ Auto-login using saved token
+    accessToken = storedToken;
+    showLogout(); // update UI
+    fetchEmails(); // load events
+    return; // ✅ No need to initialize Google Sign-In again
+  }
+
+  // No token stored — proceed with Google Sign-In button setup
   try {
     google.accounts.id.initialize({
       client_id:
@@ -203,4 +223,27 @@ window.onload = function () {
     document.getElementById("email-error").textContent =
       "Google Sign-In init failed.";
   }
+  document.getElementById("logoutButton").addEventListener("click", function () {
+  localStorage.removeItem("accessToken");
+  accessToken = null;
+
+  // Clear UI
+  document.getElementById("eventContainer").innerHTML = "";
+
+  // Hide logout, show login
+  showLogin();
+});
+
 };
+// ✅ Utility UI Functions
+
+function showLogin() {
+  document.getElementById("loginDiv").style.display = "block"; // Or display One Tap again
+  document.getElementById("logoutButton").style.display = "none";
+}
+
+function showLogout() {
+  document.getElementById("loginDiv").style.display = "none";
+  document.getElementById("logoutButton").style.display = "inline-block";
+}
+
