@@ -57,7 +57,6 @@ localStorage.setItem("userEmail", email);
     });
 }
 
-
 // Fetch Emails from backend
 async function fetchEmails() {
   const emailList = document.getElementById("email-list");
