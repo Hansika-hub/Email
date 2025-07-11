@@ -3,44 +3,54 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Event Email Extractor</title>
   <link rel="icon" type="image/png" href="/favicon.png" />
+  <script src="https://apis.google.com/js/api.js" async defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <link href="Proemail.css" rel="stylesheet" />
+
+  <link href="Proemail.css" rel="stylesheet">
 </head>
 <body>
   <div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
   <div class="sidebar" id="sidebar">
-    <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+    <div>
+      <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+    </div>
     <div class="menu">
-      <div class="menu-item" onclick="showSection('upcoming')">📅 Upcoming (<span id="upcoming-count">0</span>)</div>
-      <div class="menu-item" onclick="showSection('attended')">✅ Attended (<span id="attended-count">0</span>)</div>
-      <div class="menu-item" onclick="showSection('missed')">❌ Missed (<span id="missed-count">0</span>)</div>
-      <div class="menu-item" onclick="logout()">🚪 Logout</div>
+      <div class="menu-item">📅 <span>Upcoming (<span id="upcoming-count">0</span>)</span></div>
+      <div class="menu-item">✅ <span>Attended (<span id="attended-count">0</span>)</span></div>
+      <div class="menu-item">❌ <span>Missed (<span id="missed-count">0</span>)</span></div>
+      <button class="menu-item login-sign-up" id="login-button" style="background: none; border: none; cursor: pointer;">
+        👤 <span>Login with Google</span>
+      </button>
     </div>
   </div>
 
-  <div class="content">
+  <div class="content" id="mainContent">
     <div class="topbar">
-      <h1>Event Email Extractor</h1>
+      <h1>Event Email Extraction</h1>
     </div>
 
-    <!-- Login Button -->
-    <div id="login-section">
-      <div id="login-button" class="menu-item login-sign-up"></div>
+    <!-- Email List Section -->
+    <div id="email-section" style="margin-bottom: 1rem;">
+      <h2>Emails</h2>
+      <div id="email-list" style="max-height: 200px; overflow-y: auto; margin-bottom: 1rem;"></div>
+      <div id="email-loading" style="display: none;">Loading emails...</div>
       <div id="email-error" style="color: red; display: none;"></div>
     </div>
 
-    <!-- Search -->
-    <input type="text" id="search-events" placeholder="Search events..." style="margin-bottom: 1rem; padding: 0.5rem; border-radius: 4px; border: 1px solid #ccc; width: 100%;" />
+    <!-- Search and Add Event -->
+    <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+      <input type="text" id="search-events" placeholder="Search events..." style="padding: 0.5rem; border-radius: 4px; border: none; flex-grow: 1; max-width: 300px;">
+      <button id="add-event-btn" style="padding: 0.5rem 1rem; background-color: #ec4899; border: none; border-radius: 4px; color: white;" disabled>+ Add Event</button>
+    </div>
 
-    <!-- Events Display -->
+    <!-- Events Section -->
     <div class="events" id="events-list">
       <div id="events-loading" style="display: none;">Loading events...</div>
       <div id="events-error" style="color: red; display: none;"></div>
     </div>
 
-    <!-- Summary -->
+    <!-- Summary Section -->
     <div class="summary">
       <div class="card"><span id="total-events">0</span><br><small>Total Events</small></div>
       <div class="card"><span id="this-week-events">0</span><br><small>This Week</small></div>
@@ -52,6 +62,9 @@
     </footer>
   </div>
 
+  <!-- Google Platform Script -->
+  <script src="https://apis.google.com/js/platform.js" defer></script>
   <script src="Proemail.js" defer></script>
+
 </body>
 </html>
