@@ -63,73 +63,35 @@ async function fetchEmails() {
   const emailList = document.getElementById("email-list");
   const emailLoading = document.getElementById("email-loading");
   const emailError = document.getElementById("email-error");
-  const eventsList = document.getElementById("events-list");
 
   emailLoading.style.display = "block";
   emailError.style.display = "none";
-  eventsList.innerHTML = ""; // Clear previous events
 
   try {
-     const res = await fetch(`${BACKEND_URL}/fetch_emails`, {
+    const res = await fetch(`${BACKEND_URL}/fetch_emails`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-    
-    if (!res.ok) {
-      const errorText = await res.text();  // Detailed error from backend
-      console.error("❌ Fetch Emails failed:", res.status, errorText);
-      throw new Error("Email fetch failed");
-    }
 
+    if (!res.ok) throw new Error("Email fetch failed");
 
     const emails = await res.json();
     emailList.innerHTML = "";
 
-    let totalExtractedEvents = [];
-    const maxEmails = 10;
-
-    for (let i = 0; i < Math.min(emails.length, maxEmails); i++) {
-      const email = emails[i];
-      try {
-        const eventRes = await fetch(`${BACKEND_URL}/process_emails`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({ emailId: email.id }),
-        });
-
-        if (!eventRes.ok) continue;
-
-        const events = await eventRes.json();
-
-        const validEvents = events.filter(event => {
-          let count = 0;
-          if (event.event_name) count++;
-          if (event.date) count++;
-          if (event.time) count++;
-          if (event.venue) count++;
-          return count >= 3;
-        });
-
-        totalExtractedEvents.push(...validEvents);
-      } catch (innerErr) {
-        console.warn("Skipping email due to error:", innerErr);
-      }
-    }
-
-    displayEventCards(totalExtractedEvents);
-    updateSummary(totalExtractedEvents);
+    emails.forEach((email) => {
+      const div = document.createElement("div");
+      div.className = "email-item";
+      div.textContent = email.subject || "No Subject";
+      div.addEventListener("click", () => fetchEvents(email.id));
+      emailList.appendChild(div);
+    });
   } catch (err) {
     console.error(err);
     emailError.style.display = "block";
-    emailError.textContent = "Failed to fetch or process emails.";
+    emailError.textContent = "Failed to fetch emails.";
   } finally {
     emailLoading.style.display = "none";
   }
 }
-
-
 
 // Extract events from a selected email
 async function fetchEvents(emailId) {
