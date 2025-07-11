@@ -224,20 +224,31 @@ window.onload = function () {
       "Google Sign-In init failed.";
   }
   document.getElementById("logoutButton").addEventListener("click", function () {
+  console.log("Logout clicked");
   localStorage.removeItem("accessToken");
   accessToken = null;
 
   // Clear UI
-  document.getElementById("eventContainer").innerHTML = "";
+  document.getElementById("events-list").innerHTML = "";
+  document.getElementById("email-list").innerHTML = "";
+  document.getElementById("total-events").textContent = 0;
+  document.getElementById("this-week-events").textContent = 0;
+  document.getElementById("total-attendees").textContent = 0;
+  document.getElementById("upcoming-count").textContent = 0;
+  document.getElementById("attended-count").textContent = 0;
+  document.getElementById("missed-count").textContent = 0;
+
 
   // Hide logout, show login
   showLogin();
+  google.accounts.id.disableAutoSelect();
 });
 
 };
 // ✅ Utility UI Functions
 
 function showLogin() {
+  console.log("Showing login");
   document.getElementById("loginDiv").style.display = "block"; // Or display One Tap again
   document.getElementById("logoutButton").style.display = "none";
 }
