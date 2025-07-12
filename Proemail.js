@@ -128,7 +128,7 @@ async function fetchEvents(emailId) {
     if (!res.ok) throw new Error("Event extraction failed");
 
     const events = await res.json();
-    eventsList.innerHTML = "";
+    // eventsList.innerHTML = "";
 
     events.forEach((event) => {
       const card = document.createElement("div");
