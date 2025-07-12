@@ -48,7 +48,10 @@ function handleCredentialResponse(response) {
           startTokenRefreshInterval();
 
           // ✅ Fetch emails
-          fetchEmails();
+         fetchEmails().then((emails) => {
+         processAllEmails(emails, 5); // ✅ Start by processing first 10 emails
+        });
+
         }
       });
 
@@ -97,6 +100,7 @@ async function fetchEmails() {
       div.addEventListener("click", () => fetchEvents(email.id));
       emailList.appendChild(div);
     });
+    return emails;
   } catch (err) {
     console.error(err);
     emailError.style.display = "block";
@@ -104,6 +108,59 @@ async function fetchEmails() {
   } finally {
     emailLoading.style.display = "none";
   }
+}
+
+async function processAllEmails(emails, limit = 10) {
+  const eventsList = document.getElementById("events-list");
+
+  const processedEmails = new Set(); // Prevent duplicates
+  let count = 0;
+
+  for (let email of emails) {
+    if (count >= limit) break;
+
+    if (processedEmails.has(email.id)) continue;
+    processedEmails.add(email.id);
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/process_emails`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ emailId: email.id }),
+      });
+
+      if (!res.ok) throw new Error("Event extraction failed");
+
+      const events = await res.json();
+
+      if (events.length > 0) {
+        events.forEach((event) => {
+          const card = document.createElement("div");
+          card.className = "card";
+          card.innerHTML = `
+            <div style="color: #8b5cf6; font-weight: bold;">${event.type || "Event"}</div>
+            <h2>${event.event_name || "No Title"}</h2>
+            <p>📅 ${event.date || "N/A"}</p>
+            <p>⏰ ${event.time || "N/A"}</p>
+            <p>📍 ${event.venue || "N/A"}</p>
+          `;
+          eventsList.appendChild(card);
+        });
+
+        updateSummary(events);
+      }
+
+      count++; // ⏳ Limit processing to avoid overload
+    } catch (err) {
+      console.error(`Error processing email ${email.id}:`, err);
+      continue;
+    }
+  }
+
+  console.log(`✅ Processed ${count} email(s) for events`);
 }
 
 // Extract events from a selected email
