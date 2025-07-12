@@ -243,33 +243,47 @@ window.onload = function () {
 
   // ✅ Proper logout functionality
   document.getElementById("logoutButton").addEventListener("click", () => {
-    const email = localStorage.getItem("userEmail");
+  const email = localStorage.getItem("userEmail");
 
-    // Clear all stored login info
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("userEmail");
-    localStorage.removeItem("lastLogin");
-    accessToken = null;
+  // Clear stored login info
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("userEmail");
+  localStorage.removeItem("lastLogin");
+  accessToken = null;
 
-    // Clear UI
-    document.getElementById("events-list").innerHTML = "";
-    document.getElementById("email-list").innerHTML = "";
-    document.getElementById("total-events").textContent = 0;
-    document.getElementById("this-week-events").textContent = 0;
-    document.getElementById("total-attendees").textContent = 0;
-    document.getElementById("upcoming-count").textContent = 0;
-    document.getElementById("attended-count").textContent = 0;
-    document.getElementById("missed-count").textContent = 0;
+  // Clear UI
+  document.getElementById("events-list").innerHTML = "";
+  document.getElementById("email-list").innerHTML = "";
+  document.getElementById("total-events").textContent = 0;
+  document.getElementById("this-week-events").textContent = 0;
+  document.getElementById("total-attendees").textContent = 0;
+  document.getElementById("upcoming-count").textContent = 0;
+  document.getElementById("attended-count").textContent = 0;
+  document.getElementById("missed-count").textContent = 0;
 
-    showLogin(); // Toggle UI back to login
+  showLogin();
 
-    if (email) {
-      google.accounts.id.revoke(email, () => {
-        console.log("✅ Google session revoked");
-      });
-    }
+  // 🧠 Re-render the login button
+  google.accounts.id.initialize({
+    client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
+    callback: handleCredentialResponse,
+    auto_select: false,
   });
-};
+
+  google.accounts.id.renderButton(document.getElementById("login-button"), {
+    theme: "outline",
+    size: "large",
+    width: 300,
+  });
+
+  // Optional: revoke Google session too
+  if (email) {
+    google.accounts.id.revoke(email, () => {
+      console.log("✅ Google session revoked");
+    });
+  }
+});
+
 
 
 // UI Utility Functions
