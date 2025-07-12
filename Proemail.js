@@ -49,7 +49,7 @@ function handleCredentialResponse(response) {
 
           // ✅ Fetch emails
          fetchEmails().then((emails) => {
-         processAllEmails(emails, 5); // ✅ Start by processing first 10 emails
+         processAllEmails(emails, 10); // ✅ Start by processing first 10 emails
         });
 
         }
