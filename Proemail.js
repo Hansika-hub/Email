@@ -6,12 +6,13 @@ function toggleSidebar() {
 
 const BACKEND_URL = "https://email-backend-bu9l.onrender.com";
 let accessToken = null;
+let tokenClient = null; // 🔁 For refresh token reuse
 
 // Handle login success (from Google One Tap or button)
 function handleCredentialResponse(response) {
   const idToken = response.credential;
 
-  // Step 1: Send ID token to backend
+  // Send ID token to backend to verify and save session
   fetch(`${BACKEND_URL}/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -21,20 +22,37 @@ function handleCredentialResponse(response) {
       if (!res.ok) throw new Error("ID token verification failed");
       return res.json();
     })
-    .then(() => {
-      // Step 2: Request access token with OAuth scope
-      google.accounts.oauth2
-        .initTokenClient({
-          client_id:
-            "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
-          scope: "https://www.googleapis.com/auth/gmail.readonly",
-          callback: (tokenResponse) => {
-            if (tokenResponse.error) throw new Error("Access token error");
-            accessToken = tokenResponse.access_token;
-            fetchEmails();
-          },
-        })
-        .requestAccessToken();
+    .then((data) => {
+      const email = data.user;
+
+      // ✅ Save login metadata in localStorage
+      localStorage.setItem("userEmail", email);
+      localStorage.setItem("lastLogin", Date.now().toString());
+
+      // Request Gmail access token
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
+        scope: "https://www.googleapis.com/auth/gmail.readonly",
+        callback: (tokenResponse) => {
+          if (tokenResponse.error) throw new Error("Access token error");
+
+          accessToken = tokenResponse.access_token;
+
+          // ✅ Store the access token
+          localStorage.setItem("accessToken", accessToken);
+
+          // ✅ Update UI
+          showLogout();
+
+          // ✅ Start refresh interval
+          startTokenRefreshInterval();
+
+          // ✅ Fetch emails
+          fetchEmails();
+        }
+      });
+
+      tokenClient.requestAccessToken(); // Trigger initial login
     })
     .catch((err) => {
       console.error("Login failed:", err);
@@ -42,6 +60,15 @@ function handleCredentialResponse(response) {
       errBox.style.display = "block";
       errBox.textContent = "Login failed. Try again.";
     });
+}
+
+// 🔁 Refresh Gmail access token every 55 mins
+function startTokenRefreshInterval() {
+  setInterval(() => {
+    if (tokenClient && localStorage.getItem("userEmail")) {
+      tokenClient.requestAccessToken(); // silent refresh
+    }
+  }, 55 * 60 * 1000);
 }
 
 // Fetch Emails from backend
@@ -166,41 +193,75 @@ function setupSearch() {
   });
 }
 
-// Init Google Sign-In & render button
+// Init Google Sign-In & handle auto-login
 window.onload = function () {
   setupSearch();
 
-  try {
+  const userEmail = localStorage.getItem("userEmail");
+  const lastLogin = parseInt(localStorage.getItem("lastLogin") || "0");
+
+  if (userEmail && Date.now() - lastLogin < 7 * 24 * 60 * 60 * 1000) {
+    // 🧠 Auto-login attempt via One Tap
     google.accounts.id.initialize({
-      client_id:
-        "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
+      client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
       callback: handleCredentialResponse,
-      auto_select: false,
-      cancel_on_tap_outside: true,
-      itp_support: true,
+      auto_select: true, // ✅ Try silent login
     });
 
-    const loginButton = document.getElementById("login-button");
-    if (!loginButton) {
-      console.error("Login button element not found");
-      document.getElementById("email-error").style.display = "block";
-      document.getElementById("email-error").textContent =
-        "Login button not found.";
-      return;
-    }
+    google.accounts.id.prompt(); // ✅ One Tap shown automatically
+  } else {
+    // 🔓 No login saved — show login button
+    google.accounts.id.initialize({
+      client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
+      callback: handleCredentialResponse,
+      auto_select: false,
+    });
 
-    google.accounts.id.renderButton(loginButton, {
+    google.accounts.id.renderButton(document.getElementById("login-button"), {
       theme: "outline",
       size: "large",
       width: 300,
     });
 
-    // Optional: Show One Tap
-    google.accounts.id.prompt();
-  } catch (err) {
-    console.error("GSI Initialization failed:", err);
-    document.getElementById("email-error").style.display = "block";
-    document.getElementById("email-error").textContent =
-      "Google Sign-In init failed.";
+    google.accounts.id.prompt(); // Optional One Tap
   }
+
+  document.getElementById("logoutButton").addEventListener("click", () => {
+    const email = localStorage.getItem("userEmail");
+
+    // 🔒 Clear all saved login tokens
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("userEmail");
+    localStorage.removeItem("lastLogin");
+    accessToken = null;
+
+    // Clear UI
+    document.getElementById("events-list").innerHTML = "";
+    document.getElementById("email-list").innerHTML = "";
+    document.getElementById("total-events").textContent = 0;
+    document.getElementById("this-week-events").textContent = 0;
+    document.getElementById("total-attendees").textContent = 0;
+    document.getElementById("upcoming-count").textContent = 0;
+    document.getElementById("attended-count").textContent = 0;
+    document.getElementById("missed-count").textContent = 0;
+
+    showLogin();
+
+    if (email) {
+      google.accounts.id.revoke(email, () => {
+        console.log("Google session revoked");
+      });
+    }
+  });
 };
+
+// UI Utility Functions
+function showLogin() {
+  document.getElementById("loginDiv").style.display = "block";
+  document.getElementById("logoutButton").style.display = "none";
+}
+
+function showLogout() {
+  document.getElementById("loginDiv").style.display = "none";
+  document.getElementById("logoutButton").style.display = "inline-block";
+}
