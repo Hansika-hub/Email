@@ -7,37 +7,16 @@ function toggleSidebar() {
 const BACKEND_URL = "https://email-backend-bu9l.onrender.com";
 let accessToken = null;
 
-// Refresh Gmail access token
-function refreshAccessToken() {
-  return new Promise((resolve, reject) => {
-    google.accounts.oauth2
-      .initTokenClient({
-        client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
-        scope: "https://www.googleapis.com/auth/gmail.readonly",
-        callback: (tokenResponse) => {
-          if (tokenResponse.error) {
-            console.error("Token refresh failed", tokenResponse);
-            reject("Token refresh error");
-          } else {
-            accessToken = tokenResponse.access_token;
-            localStorage.setItem("accessToken", accessToken);
-            resolve(accessToken);
-          }
-        },
-      })
-      .requestAccessToken();
-  });
-}
-
-// Handle Google Sign-In response
+// Handle login success (from Google One Tap or button)
 function handleCredentialResponse(response) {
   const idToken = response.credential;
   const payload = JSON.parse(atob(idToken.split('.')[1]));
   const email = payload.email;
 
-  localStorage.setItem("userEmail", email);
+// Save for revoking later
+localStorage.setItem("userEmail", email);
 
-  // Step 1: Verify ID token with backend
+  // Step 1: Send ID token to backend
   fetch(`${BACKEND_URL}/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -48,16 +27,23 @@ function handleCredentialResponse(response) {
       return res.json();
     })
     .then(() => {
-      // Step 2: Get Gmail access token
+      // Step 2: Request Gmail access token
       google.accounts.oauth2
         .initTokenClient({
-          client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
+          client_id:
+            "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
           scope: "https://www.googleapis.com/auth/gmail.readonly",
           callback: (tokenResponse) => {
             if (tokenResponse.error) throw new Error("Access token error");
             accessToken = tokenResponse.access_token;
+
+            // ✅ Save token to localStorage
             localStorage.setItem("accessToken", accessToken);
+
+            // ✅ Update UI
             showLogout();
+
+            // ✅ Proceed to fetch emails
             fetchEmails();
           },
         })
@@ -71,7 +57,8 @@ function handleCredentialResponse(response) {
     });
 }
 
-// Fetch unread emails
+
+// Fetch Emails from backend
 async function fetchEmails() {
   const emailList = document.getElementById("email-list");
   const emailLoading = document.getElementById("email-loading");
@@ -80,49 +67,61 @@ async function fetchEmails() {
 
   emailLoading.style.display = "block";
   emailError.style.display = "none";
+  eventsList.innerHTML = ""; // Clear previous events
 
   try {
     const res = await fetch(`${BACKEND_URL}/fetch_emails`, {
+     const res = await fetch(`${BACKEND_URL}/fetch_emails`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
+    
+    if (!res.ok) {
+      const errorText = await res.text();  // Detailed error from backend
+      console.error("❌ Fetch Emails failed:", res.status, errorText);
+      throw new Error("Email fetch failed");
+    }
 
     if (!res.ok) throw new Error("Email fetch failed");
 
     const emails = await res.json();
     emailList.innerHTML = "";
-    eventsList.innerHTML = "";
 
     let totalExtractedEvents = [];
+    const maxEmails = 10;
 
-    for (const email of emails) {
-      const eventRes = await fetch(`${BACKEND_URL}/process_emails`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ emailId: email.id }),
-      });
+    for (let i = 0; i < Math.min(emails.length, maxEmails); i++) {
+      const email = emails[i];
+      try {
+        const eventRes = await fetch(`${BACKEND_URL}/process_emails`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ emailId: email.id }),
+        });
 
-      if (!eventRes.ok) continue;
+        if (!eventRes.ok) continue;
 
-      const events = await eventRes.json();
+        const events = await eventRes.json();
 
-      const validEvents = events.filter(event => {
-        let count = 0;
-        if (event.event_name) count++;
-        if (event.date) count++;
-        if (event.time) count++;
-        if (event.venue) count++;
-        return count >= 3;
-      });
+        const validEvents = events.filter(event => {
+          let count = 0;
+          if (event.event_name) count++;
+          if (event.date) count++;
+          if (event.time) count++;
+          if (event.venue) count++;
+          return count >= 3;
+        });
 
-      totalExtractedEvents.push(...validEvents);
+        totalExtractedEvents.push(...validEvents);
+      } catch (innerErr) {
+        console.warn("Skipping email due to error:", innerErr);
+      }
     }
 
     displayEventCards(totalExtractedEvents);
     updateSummary(totalExtractedEvents);
-
   } catch (err) {
     console.error(err);
     emailError.style.display = "block";
@@ -132,7 +131,9 @@ async function fetchEmails() {
   }
 }
 
-// Fetch events from a selected email
+
+
+// Extract events from a selected email
 async function fetchEvents(emailId) {
   const eventsList = document.getElementById("events-list");
   const eventsLoading = document.getElementById("events-loading");
@@ -179,25 +180,7 @@ async function fetchEvents(emailId) {
   }
 }
 
-// Display event cards
-function displayEventCards(events) {
-  const eventsList = document.getElementById("events-list");
-  eventsList.innerHTML = "";
-  events.forEach((event) => {
-    const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `
-      <div style="color: #8b5cf6; font-weight: bold;">${event.type || "Event"}</div>
-      <h2>${event.event_name || "No Title"}</h2>
-      <p>📅 ${event.date || "N/A"}</p>
-      <p>⏰ ${event.time || "N/A"}</p>
-      <p>📍 ${event.venue || "N/A"}</p>
-    `;
-    eventsList.appendChild(card);
-  });
-}
-
-// Update dashboard metrics
+// Update event dashboard
 function updateSummary(events) {
   const total = events.length;
   const today = new Date();
@@ -224,7 +207,23 @@ function updateSummary(events) {
   document.getElementById("missed-count").textContent = 0;
 }
 
-// Search setup
+function displayEventCards(events) {
+  const eventsList = document.getElementById("events-list");
+  events.forEach((event) => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div style="color: #8b5cf6; font-weight: bold;">${event.type || "Event"}</div>
+      <h2>${event.event_name || "No Title"}</h2>
+      <p>📅 ${event.date || "N/A"}</p>
+      <p>⏰ ${event.time || "N/A"}</p>
+      <p>📍 ${event.venue || "N/A"}</p>
+    `;
+    eventsList.appendChild(card);
+  });
+}
+
+// Search event cards
 function setupSearch() {
   const input = document.getElementById("search-events");
   input.addEventListener("input", (e) => {
@@ -237,9 +236,87 @@ function setupSearch() {
   });
 }
 
-// UI toggles
+// Init Google Sign-In & render button
+window.onload = function () {
+  setupSearch();
+
+  const storedToken = localStorage.getItem("accessToken");
+
+  if (storedToken) {
+    // ✅ Auto-login using saved token
+    accessToken = storedToken;
+    showLogout(); // update UI
+    fetchEmails(); // load events
+    return; // ✅ No need to initialize Google Sign-In again
+  }
+
+  // No token stored — proceed with Google Sign-In button setup
+  try {
+    google.accounts.id.initialize({
+      client_id:
+        "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
+      callback: handleCredentialResponse,
+      auto_select: false,
+      cancel_on_tap_outside: true,
+      itp_support: true,
+    });
+
+    const loginButton = document.getElementById("login-button");
+    if (!loginButton) {
+      console.error("Login button element not found");
+      document.getElementById("email-error").style.display = "block";
+      document.getElementById("email-error").textContent =
+        "Login button not found.";
+      return;
+    }
+
+    google.accounts.id.renderButton(loginButton, {
+      theme: "outline",
+      size: "large",
+      width: 300,
+    });
+
+    // Optional: Show One Tap
+    google.accounts.id.prompt();
+  } catch (err) {
+    console.error("GSI Initialization failed:", err);
+    document.getElementById("email-error").style.display = "block";
+    document.getElementById("email-error").textContent =
+      "Google Sign-In init failed.";
+  }
+  document.getElementById("logoutButton").addEventListener("click", function () {
+  console.log("Logout clicked");
+
+  const email = localStorage.getItem("userEmail"); // we’ll save this on login
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("userEmail");
+  accessToken = null;
+
+  // Clear UI
+  document.getElementById("events-list").innerHTML = "";
+  document.getElementById("email-list").innerHTML = "";
+  document.getElementById("total-events").textContent = 0;
+  document.getElementById("this-week-events").textContent = 0;
+  document.getElementById("total-attendees").textContent = 0;
+  document.getElementById("upcoming-count").textContent = 0;
+  document.getElementById("attended-count").textContent = 0;
+  document.getElementById("missed-count").textContent = 0;
+
+  showLogin();
+
+  if (email) {
+    google.accounts.id.revoke(email, () => {
+      console.log("Google session revoked");
+    });
+  }
+});
+
+};
+// ✅ Utility UI Functions
+
 function showLogin() {
-  document.getElementById("loginDiv").style.display = "block";
+  console.log("Showing login");
+  document.getElementById("loginDiv").style.display = "block"; // Or display One Tap again
   document.getElementById("logoutButton").style.display = "none";
 }
 
@@ -247,77 +324,3 @@ function showLogout() {
   document.getElementById("loginDiv").style.display = "none";
   document.getElementById("logoutButton").style.display = "inline-block";
 }
-
-// Init on page load
-window.onload = async function () {
-  setupSearch();
-
-  const storedToken = localStorage.getItem("accessToken");
-
-  if (storedToken) {
-    accessToken = storedToken;
-    showLogout();
-
-    try {
-      await fetchEmails();
-    } catch (e) {
-      console.warn("⚠️ Stored token may be expired. Refreshing...");
-      try {
-        await refreshAccessToken();
-        await fetchEmails();
-      } catch (e2) {
-        console.error("❌ Token refresh failed or email fetch failed again");
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("userEmail");
-        accessToken = null;
-        showLogin();
-      }
-    }
-  } else {
-    try {
-      google.accounts.id.initialize({
-        client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
-        callback: handleCredentialResponse,
-        auto_select: false,
-        cancel_on_tap_outside: true,
-        itp_support: true,
-      });
-
-      google.accounts.id.renderButton(document.getElementById("login-button"), {
-        theme: "outline",
-        size: "large",
-        width: 300,
-      });
-
-      google.accounts.id.prompt();
-    } catch (err) {
-      console.error("GSI Initialization failed:", err);
-      document.getElementById("email-error").style.display = "block";
-      document.getElementById("email-error").textContent = "Google Sign-In init failed.";
-    }
-  }
-
-  document.getElementById("logoutButton").addEventListener("click", function () {
-    const email = localStorage.getItem("userEmail");
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("userEmail");
-    accessToken = null;
-
-    document.getElementById("events-list").innerHTML = "";
-    document.getElementById("email-list").innerHTML = "";
-    document.getElementById("total-events").textContent = 0;
-    document.getElementById("this-week-events").textContent = 0;
-    document.getElementById("total-attendees").textContent = 0;
-    document.getElementById("upcoming-count").textContent = 0;
-    document.getElementById("attended-count").textContent = 0;
-    document.getElementById("missed-count").textContent = 0;
-
-    showLogin();
-
-    if (email) {
-      google.accounts.id.revoke(email, () => {
-        console.log("🔓 Google session revoked");
-      });
-    }
-  });
-};
