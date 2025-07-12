@@ -71,7 +71,6 @@ async function fetchEmails() {
 
   try {
     const res = await fetch(`${BACKEND_URL}/fetch_emails`, {
-     const res = await fetch(`${BACKEND_URL}/fetch_emails`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     
