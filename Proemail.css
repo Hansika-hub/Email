@@ -85,6 +85,8 @@ body {
   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
 } */
 .card {
+  background: white;
+  color: #333;
   font-size: 0.9rem;
   padding: 10px;
   margin-bottom: 12px;
