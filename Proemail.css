@@ -77,13 +77,21 @@ body {
 .sidebar.open ~ .content {
   margin-left: 250px;
 }
-.card {
+/* .card {
   background: white;
   color: #333;
   padding: 1rem;
   border-radius: 8px;
   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+} */
+.card {
+  font-size: 0.9rem;
+  padding: 10px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
+
 .events, .summary {
   display: grid;
   gap: 1rem;
@@ -159,3 +167,9 @@ footer {
   overflow-y: auto;
   padding-bottom: 2rem;
 }
+
+#events-list {
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
