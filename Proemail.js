@@ -284,7 +284,7 @@ window.onload = function () {
   }
 });
 
-
+}
 
 // UI Utility Functions
 function showLogin() {
