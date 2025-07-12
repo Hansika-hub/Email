@@ -197,45 +197,57 @@ function setupSearch() {
 window.onload = function () {
   setupSearch();
 
-  const userEmail = localStorage.getItem("userEmail");
+  const email = localStorage.getItem("userEmail");
   const lastLogin = parseInt(localStorage.getItem("lastLogin") || "0");
+  const savedAccessToken = localStorage.getItem("accessToken");
 
-  if (userEmail && Date.now() - lastLogin < 7 * 24 * 60 * 60 * 1000) {
-    // 🧠 Auto-login attempt via One Tap
-    google.accounts.id.initialize({
-      client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
-      callback: handleCredentialResponse,
-      auto_select: true, // ✅ Try silent login
-    });
+  // 🔁 Setup tokenClient again
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
+    scope: "https://www.googleapis.com/auth/gmail.readonly",
+    callback: (tokenResponse) => {
+      if (tokenResponse.error) {
+        console.error("Token refresh error", tokenResponse);
+        return;
+      }
 
-    google.accounts.id.prompt(); // ✅ One Tap shown automatically
-  } else {
-    // 🔓 No login saved — show login button
-    google.accounts.id.initialize({
-      client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
-      callback: handleCredentialResponse,
-      auto_select: false,
-    });
+      accessToken = tokenResponse.access_token;
+      localStorage.setItem("accessToken", accessToken);
+    },
+  });
 
-    google.accounts.id.renderButton(document.getElementById("login-button"), {
-      theme: "outline",
-      size: "large",
-      width: 300,
-    });
-
-    google.accounts.id.prompt(); // Optional One Tap
+  // ✅ If within 7 days and saved token exists, silently refresh access
+  if (email && savedAccessToken && Date.now() - lastLogin < 7 * 24 * 60 * 60 * 1000) {
+    accessToken = savedAccessToken;
+    showLogout(); // 🔁 Update UI
+    startTokenRefreshInterval(); // 🔁 Background refresh
+    fetchEmails(); // ✅ Load emails
+    tokenClient.requestAccessToken(); // 🔁 Silent refresh
+    return;
   }
 
-  document.getElementById("logoutButton").addEventListener("click", () => {
-    const email = localStorage.getItem("userEmail");
+  // 🔓 Else show login button
+  google.accounts.id.initialize({
+    client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
+    callback: handleCredentialResponse,
+    auto_select: false,
+  });
 
-    // 🔒 Clear all saved login tokens
+  google.accounts.id.renderButton(document.getElementById("login-button"), {
+    theme: "outline",
+    size: "large",
+    width: 300,
+  });
+
+  google.accounts.id.prompt(); // Optional One Tap prompt
+
+  // 🔒 Handle logout
+  document.getElementById("logoutButton").addEventListener("click", () => {
     localStorage.removeItem("accessToken");
     localStorage.removeItem("userEmail");
     localStorage.removeItem("lastLogin");
     accessToken = null;
 
-    // Clear UI
     document.getElementById("events-list").innerHTML = "";
     document.getElementById("email-list").innerHTML = "";
     document.getElementById("total-events").textContent = 0;
@@ -247,11 +259,9 @@ window.onload = function () {
 
     showLogin();
 
-    if (email) {
-      google.accounts.id.revoke(email, () => {
-        console.log("Google session revoked");
-      });
-    }
+    google.accounts.id.revoke(email, () => {
+      console.log("Google session revoked");
+    });
   });
 };
 
