@@ -279,7 +279,10 @@ window.onload = function () {
     startTokenRefreshInterval();
 
     // Fetch emails automatically on page load
-    fetchEmails();
+    fetchEmails().then((emails) => {
+    processAllEmails(emails, 10); // Or increase limit after testing
+  });
+
   } else {
     // Fresh login required
     google.accounts.id.initialize({
