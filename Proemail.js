@@ -197,57 +197,61 @@ function setupSearch() {
 window.onload = function () {
   setupSearch();
 
-  const email = localStorage.getItem("userEmail");
+  const userEmail = localStorage.getItem("userEmail");
   const lastLogin = parseInt(localStorage.getItem("lastLogin") || "0");
   const savedAccessToken = localStorage.getItem("accessToken");
 
-  // 🔁 Setup tokenClient again
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
-    scope: "https://www.googleapis.com/auth/gmail.readonly",
-    callback: (tokenResponse) => {
-      if (tokenResponse.error) {
-        console.error("Token refresh error", tokenResponse);
-        return;
-      }
-
-      accessToken = tokenResponse.access_token;
-      localStorage.setItem("accessToken", accessToken);
-    },
-  });
-
-  // ✅ If within 7 days and saved token exists, silently refresh access
-  if (email && savedAccessToken && Date.now() - lastLogin < 7 * 24 * 60 * 60 * 1000) {
+  // Reuse accessToken if within 7 days and refresh it every 55 mins
+  if (userEmail && savedAccessToken && Date.now() - lastLogin < 7 * 24 * 60 * 60 * 1000) {
     accessToken = savedAccessToken;
-    showLogout(); // 🔁 Update UI
-    startTokenRefreshInterval(); // 🔁 Background refresh
-    fetchEmails(); // ✅ Load emails
-    tokenClient.requestAccessToken(); // 🔁 Silent refresh
-    return;
+
+    // Show Logout button since user is considered logged in
+    showLogout();
+
+    // Re-initialize token client for refresh
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
+      scope: "https://www.googleapis.com/auth/gmail.readonly",
+      callback: (tokenResponse) => {
+        accessToken = tokenResponse.access_token;
+        localStorage.setItem("accessToken", accessToken);
+      }
+    });
+
+    // Refresh access token every 55 minutes
+    startTokenRefreshInterval();
+
+    // Fetch emails automatically on page load
+    fetchEmails();
+  } else {
+    // Fresh login required
+    google.accounts.id.initialize({
+      client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
+      callback: handleCredentialResponse,
+      auto_select: false,
+    });
+
+    google.accounts.id.renderButton(document.getElementById("login-button"), {
+      theme: "outline",
+      size: "large",
+      width: 300,
+    });
+
+    google.accounts.id.prompt(); // Optional One Tap
+    showLogin(); // Show login if not already authenticated
   }
 
-  // 🔓 Else show login button
-  google.accounts.id.initialize({
-    client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
-    callback: handleCredentialResponse,
-    auto_select: false,
-  });
-
-  google.accounts.id.renderButton(document.getElementById("login-button"), {
-    theme: "outline",
-    size: "large",
-    width: 300,
-  });
-
-  google.accounts.id.prompt(); // Optional One Tap prompt
-
-  // 🔒 Handle logout
+  // ✅ Proper logout functionality
   document.getElementById("logoutButton").addEventListener("click", () => {
+    const email = localStorage.getItem("userEmail");
+
+    // Clear all stored login info
     localStorage.removeItem("accessToken");
     localStorage.removeItem("userEmail");
     localStorage.removeItem("lastLogin");
     accessToken = null;
 
+    // Clear UI
     document.getElementById("events-list").innerHTML = "";
     document.getElementById("email-list").innerHTML = "";
     document.getElementById("total-events").textContent = 0;
@@ -257,13 +261,16 @@ window.onload = function () {
     document.getElementById("attended-count").textContent = 0;
     document.getElementById("missed-count").textContent = 0;
 
-    showLogin();
+    showLogin(); // Toggle UI back to login
 
-    google.accounts.id.revoke(email, () => {
-      console.log("Google session revoked");
-    });
+    if (email) {
+      google.accounts.id.revoke(email, () => {
+        console.log("✅ Google session revoked");
+      });
+    }
   });
 };
+
 
 // UI Utility Functions
 function showLogin() {
