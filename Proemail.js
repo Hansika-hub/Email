@@ -76,12 +76,12 @@ function startTokenRefreshInterval() {
 
 // Fetch Emails from backend
 async function fetchEmails() {
-  const emailList = document.getElementById("email-list");
-  const emailLoading = document.getElementById("email-loading");
-  const emailError = document.getElementById("email-error");
+  // const emailList = document.getElementById("email-list");
+  // const emailLoading = document.getElementById("email-loading");
+  // const emailError = document.getElementById("email-error");
 
-  emailLoading.style.display = "block";
-  emailError.style.display = "none";
+  // emailLoading.style.display = "block";
+  // emailError.style.display = "none";
 
   try {
     const res = await fetch(`${BACKEND_URL}/fetch_emails`, {
@@ -102,12 +102,13 @@ async function fetchEmails() {
     // });
     return emails;
   } catch (err) {
-    console.error(err);
-    emailError.style.display = "block";
-    emailError.textContent = "Failed to fetch emails.";
-  } finally {
-    emailLoading.style.display = "none";
-  }
+    console.error("Failed to fetch emails");
+    return [];
+  //   emailError.style.display = "block";
+  //   emailError.textContent = "Failed to fetch emails.";
+  // } finally {
+    // emailLoading.style.display = "none";
+  // }
 }
 
 async function processAllEmails(emails, limit = 10) {
