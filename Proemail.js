@@ -109,7 +109,7 @@ async function fetchEmails() {
   // } finally {
     // emailLoading.style.display = "none";
   // }
-}
+}}
 
 async function processAllEmails(emails, limit = 10) {
   const eventsList = document.getElementById("events-list");
