@@ -91,15 +91,15 @@ async function fetchEmails() {
     if (!res.ok) throw new Error("Email fetch failed");
 
     const emails = await res.json();
-    emailList.innerHTML = "";
+    // emailList.innerHTML = "";
 
-    emails.forEach((email) => {
-      const div = document.createElement("div");
-      div.className = "email-item";
-      div.textContent = email.subject || "No Subject";
-      div.addEventListener("click", () => fetchEvents(email.id));
-      emailList.appendChild(div);
-    });
+    // emails.forEach((email) => {
+    //   const div = document.createElement("div");
+    //   div.className = "email-item";
+    //   div.textContent = email.subject || "No Subject";
+    //   div.addEventListener("click", () => fetchEvents(email.id));
+    //   emailList.appendChild(div);
+    // });
     return emails;
   } catch (err) {
     console.error(err);
