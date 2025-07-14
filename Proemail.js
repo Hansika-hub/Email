@@ -163,6 +163,72 @@ async function fetchEmails() {
 
 //   console.log(`✅ Processed ${count} email(s) for events`);
 // }
+// async function processAllEmails(emails, limit = 10) {
+//   const eventsList = document.getElementById("events-list");
+//   const processedEmails = new Set();
+//   let count = 0;
+
+//   for (let email of emails) {
+//     if (count >= limit) break;
+//     if (processedEmails.has(email.id)) continue;
+//     processedEmails.add(email.id);
+
+//     try {
+//       const res = await fetch(`${BACKEND_URL}/process_emails`, {
+//         method: "POST",
+//         headers: {
+//           "Content-Type": "application/json",
+//           Authorization: `Bearer ${accessToken}`,
+//         },
+//         body: JSON.stringify({ emailId: email.id }),
+//       });
+
+//       if (!res.ok) throw new Error("Event extraction failed");
+
+//       const events = await res.json();
+
+//       if (events.length > 0) {
+//         for (let event of events) {
+//           // 🎴 Create card
+//           const card = document.createElement("div");
+//           card.className = "card";
+//           card.innerHTML = `
+//             <div style="color: #8b5cf6; font-weight: bold;">${event.type || "Event"}</div>
+//             <h2>${event.event_name || "No Title"}</h2>
+//             <p>📅 ${event.date || "N/A"}</p>
+//             <p>⏰ ${event.time || "N/A"}</p>
+//             <p>📍 ${event.venue || "N/A"}</p>
+//           `;
+//           eventsList.appendChild(card);
+
+//           // 📅 Add event to Google Calendar
+//           try {
+//             await fetch(`${BACKEND_URL}/add_to_calendar`, {
+//               method: "POST",
+//               headers: {
+//                 "Content-Type": "application/json",
+//                 Authorization: `Bearer ${accessToken}`,
+//               },
+//               body: JSON.stringify(event),
+//             });
+//             console.log("✅ Added to calendar:", event.event_name);
+//           } catch (calendarErr) {
+//             console.error("❌ Calendar add failed:", calendarErr);
+//           }
+//         }
+
+//         updateSummary(events);
+//       }
+
+//       count++;
+//     } catch (err) {
+//       console.error(`Error processing email ${email.id}:`, err);
+//       continue;
+//     }
+//   }
+
+//   console.log(`✅ Processed ${count} email(s) for events`);
+// }
 async function processAllEmails(emails, limit = 10) {
   const eventsList = document.getElementById("events-list");
   const processedEmails = new Set();
@@ -203,7 +269,7 @@ async function processAllEmails(emails, limit = 10) {
 
           // 📅 Add event to Google Calendar
           try {
-            await fetch(`${BACKEND_URL}/add_to_calendar`, {
+            const response = await fetch(`${BACKEND_URL}/add_to_calendar`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -211,7 +277,21 @@ async function processAllEmails(emails, limit = 10) {
               },
               body: JSON.stringify(event),
             });
-            console.log("✅ Added to calendar:", event.event_name);
+
+            if (response.ok) {
+              // ✅ Success message
+              const statusDiv = document.createElement("div");
+              statusDiv.textContent = "✅ Added to Calendar";
+              statusDiv.style.color = "green";
+              statusDiv.style.fontSize = "0.9rem";
+              statusDiv.style.marginTop = "5px";
+              statusDiv.style.fontWeight = "bold";
+              card.appendChild(statusDiv);
+              console.log("✅ Added to calendar:", event.event_name);
+            } else {
+              console.error("❌ Failed to add to calendar:", await response.text());
+            }
+
           } catch (calendarErr) {
             console.error("❌ Calendar add failed:", calendarErr);
           }
@@ -335,7 +415,7 @@ window.onload = function () {
     // Re-initialize token client for refresh
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
-      scope: "https://www.googleapis.com/auth/gmail.readonly",
+      scope: "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.events",
       callback: (tokenResponse) => {
         accessToken = tokenResponse.access_token;
         localStorage.setItem("accessToken", accessToken);
