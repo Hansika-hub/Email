@@ -460,7 +460,7 @@ window.onload = function () {
 
   // Clear UI
   document.getElementById("events-list").innerHTML = "";
-  document.getElementById("email-list").innerHTML = "";
+  // document.getElementById("email-list").innerHTML = "";
   document.getElementById("total-events").textContent = 0;
   document.getElementById("this-week-events").textContent = 0;
   document.getElementById("total-attendees").textContent = 0;
