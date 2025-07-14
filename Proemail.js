@@ -32,7 +32,7 @@ function handleCredentialResponse(response) {
       // Request Gmail access token
       tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
-        scope: "https://www.googleapis.com/auth/gmail.readonly",
+        scope: "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.events",
         callback: (tokenResponse) => {
           if (tokenResponse.error) throw new Error("Access token error");
 
@@ -111,15 +111,65 @@ async function fetchEmails() {
   // }
 }}
 
+// async function processAllEmails(emails, limit = 10) {
+//   const eventsList = document.getElementById("events-list");
+
+//   const processedEmails = new Set(); // Prevent duplicates
+//   let count = 0;
+
+//   for (let email of emails) {
+//     if (count >= limit) break;
+
+//     if (processedEmails.has(email.id)) continue;
+//     processedEmails.add(email.id);
+
+//     try {
+//       const res = await fetch(`${BACKEND_URL}/process_emails`, {
+//         method: "POST",
+//         headers: {
+//           "Content-Type": "application/json",
+//           Authorization: `Bearer ${accessToken}`,
+//         },
+//         body: JSON.stringify({ emailId: email.id }),
+//       });
+
+//       if (!res.ok) throw new Error("Event extraction failed");
+
+//       const events = await res.json();
+
+//       if (events.length > 0) {
+//         events.forEach((event) => {
+//           const card = document.createElement("div");
+//           card.className = "card";
+//           card.innerHTML = `
+//             <div style="color: #8b5cf6; font-weight: bold;">${event.type || "Event"}</div>
+//             <h2>${event.event_name || "No Title"}</h2>
+//             <p>📅 ${event.date || "N/A"}</p>
+//             <p>⏰ ${event.time || "N/A"}</p>
+//             <p>📍 ${event.venue || "N/A"}</p>
+//           `;
+//           eventsList.appendChild(card);
+//         });
+
+//         updateSummary(events);
+//       }
+
+//       count++; // ⏳ Limit processing to avoid overload
+//     } catch (err) {
+//       console.error(`Error processing email ${email.id}:`, err);
+//       continue;
+//     }
+//   }
+
+//   console.log(`✅ Processed ${count} email(s) for events`);
+// }
 async function processAllEmails(emails, limit = 10) {
   const eventsList = document.getElementById("events-list");
-
-  const processedEmails = new Set(); // Prevent duplicates
+  const processedEmails = new Set();
   let count = 0;
 
   for (let email of emails) {
     if (count >= limit) break;
-
     if (processedEmails.has(email.id)) continue;
     processedEmails.add(email.id);
 
@@ -138,7 +188,8 @@ async function processAllEmails(emails, limit = 10) {
       const events = await res.json();
 
       if (events.length > 0) {
-        events.forEach((event) => {
+        for (let event of events) {
+          // 🎴 Create card
           const card = document.createElement("div");
           card.className = "card";
           card.innerHTML = `
@@ -149,12 +200,27 @@ async function processAllEmails(emails, limit = 10) {
             <p>📍 ${event.venue || "N/A"}</p>
           `;
           eventsList.appendChild(card);
-        });
+
+          // 📅 Add event to Google Calendar
+          try {
+            await fetch(`${BACKEND_URL}/add_to_calendar`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${accessToken}`,
+              },
+              body: JSON.stringify(event),
+            });
+            console.log("✅ Added to calendar:", event.event_name);
+          } catch (calendarErr) {
+            console.error("❌ Calendar add failed:", calendarErr);
+          }
+        }
 
         updateSummary(events);
       }
 
-      count++; // ⏳ Limit processing to avoid overload
+      count++;
     } catch (err) {
       console.error(`Error processing email ${email.id}:`, err);
       continue;
