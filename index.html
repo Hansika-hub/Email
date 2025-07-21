@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -43,19 +43,91 @@
       <div id="email-error" style="color: red; display: none;"></div>
     </div> -->
 
-    <!-- Search and Add Event -->
-    <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+    Search and Add Event -->
+<!--     <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
       <input type="text" id="search-events" placeholder="Search events..." style="padding: 0.5rem; border-radius: 4px; border: none; flex-grow: 1; max-width: 300px;">
       <button id="add-event-btn" style="padding: 0.5rem 1rem; background-color: #ec4899; border: none; border-radius: 4px; color: white;" disabled>+ Add Event</button>
     </div>
 
     <!-- Events Section -->
+<!--     <div class="events" id="events-list">
+      <div id="events-loading" style="display: none;">Loading events...</div>
+      <div id="events-error" style="color: red; display: none;"></div>
+    </div> -->
+
+    <!-- Summary Section -->
+<!--     <div class="summary">
+      <div class="card"><span id="total-events">0</span><br><small>Total Events</small></div>
+      <div class="card"><span id="this-week-events">0</span><br><small>This Week</small></div>
+      <div class="card"><span id="total-attendees">0</span><br><small>Total Attendees</small></div>
+    </div>
+
+    <footer>
+      © 2025 Event Email Extractor — <a href="policy.html" style="color: white; text-decoration: underline;">Privacy Policy</a>
+    </footer>
+  </div> -->
+
+  <!-- Google Platform Script -->
+<!--   <script src="https://apis.google.com/js/platform.js" defer></script>
+  <script src="Proemail.js" defer></script>
+
+</body>
+</html> -->
+ -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cross-Origin-Opener-Policy" content="unsafe-none" />
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <script src="https://apis.google.com/js/api.js" async defer></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <link href="Proemail.css" rel="stylesheet">
+</head>
+<body>
+  <div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
+  <div class="sidebar" id="sidebar">
+    <div>
+      <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+    </div>
+    <div class="menu">
+      <div class="menu-item">📅 <span>Upcoming (<span id="upcoming-count">0</span>)</span></div>
+      <div class="menu-item">✅ <span>Attended (<span id="attended-count">0</span>)</span></div>
+      <div class="menu-item">❌ <span>Missed (<span id="missed-count">0</span>)</span></div>
+      <div id="loginDiv">
+        <button class="menu-item login-sign-up" id="login-button" style="background: none; border: none; cursor: pointer;">
+          👤 <span>Login with Google</span>
+        </button>
+      </div>
+      <div>
+        <button id="logoutButton" class="menu-item" style="display: none;">🚪 Logout</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="content" id="mainContent">
+    <div class="topbar">
+      <h1>Event Email Extraction</h1>
+    </div>
+
+    <div id="email-section" style="margin-bottom: 1rem;">
+      <h2>Emails</h2>
+      <div id="email-list" style="max-height: 200px; overflow-y: auto; margin-bottom: 1rem;"></div>
+      <div id="email-loading" style="display: none;">Loading emails...</div>
+      <div id="email-error" style="color: red; display: none;"></div>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+      <input type="text" id="search-events" placeholder="Search events..." style="padding: 0.5rem; border-radius: 4px; border: none; flex-grow: 1; max-width: 300px;">
+      <button id="add-event-btn" style="padding: 0.5rem 1rem; background-color: #ec4899; border: none; border-radius: 4px; color: white;" disabled>+ Add Event</button>
+    </div>
+
     <div class="events" id="events-list">
       <div id="events-loading" style="display: none;">Loading events...</div>
       <div id="events-error" style="color: red; display: none;"></div>
     </div>
 
-    <!-- Summary Section -->
     <div class="summary">
       <div class="card"><span id="total-events">0</span><br><small>Total Events</small></div>
       <div class="card"><span id="this-week-events">0</span><br><small>This Week</small></div>
@@ -67,9 +139,7 @@
     </footer>
   </div>
 
-  <!-- Google Platform Script -->
   <script src="https://apis.google.com/js/platform.js" defer></script>
   <script src="Proemail.js" defer></script>
-
 </body>
 </html>
