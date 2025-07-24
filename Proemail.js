@@ -15,6 +15,7 @@ async function handleCredentialResponse(response) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token: idToken }),
+      credentials:"include"
     });
 
     if (!res.ok) throw new Error(`ID token verification failed: ${await res.text()}`);
@@ -26,7 +27,8 @@ async function handleCredentialResponse(response) {
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
       scope: "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.events",
-      access_type: "offline", // Request refresh token
+      access_type: "offline",
+      prompt:"consent",// Request refresh token
       callback: async (tokenResponse) => {
         if (tokenResponse.error) {
           console.error("Access token error:", tokenResponse.error);
@@ -310,6 +312,7 @@ window.onload = function () {
       client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
       scope: "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.events",
       access_type: "offline",
+      prompt: "consent",
       callback: (tokenResponse) => {
         accessToken = tokenResponse.access_token;
         localStorage.setItem("accessToken", accessToken);
