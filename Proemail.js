@@ -40,7 +40,7 @@ async function handleCredentialResponse(response) {
         // Send refresh token to backend if present
         if (tokenResponse.refresh_token) {
           try {
-            await fetch(`${BACKEND_URL}/store-tokens`, {
+            const storeRes = await fetch(`${BACKEND_URL}/store-tokens`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -48,6 +48,9 @@ async function handleCredentialResponse(response) {
                 refreshToken: tokenResponse.refresh_token,
               }),
             });
+            if (!storeRes.ok) {
+              console.error("Failed to store refresh token:", await storeRes.text());
+            }
           } catch (err) {
             console.error("Failed to store refresh token:", err);
           }
@@ -78,7 +81,7 @@ function startTokenRefreshInterval() {
     if (tokenClient && localStorage.getItem("userEmail")) {
       tokenClient.requestAccessToken();
     }
-  }, 50 * 60 * 1000); // Refresh every 50 minutes
+  }, 30 * 60 * 1000); // Refresh every 30 minutes to be safe
 }
 
 async function fetchEmails(retries = 3, delay = 1000) {
@@ -93,6 +96,8 @@ async function fetchEmails(retries = 3, delay = 1000) {
       if (res.status === 401) {
         showError("Session expired. Please log in again.");
         localStorage.removeItem("accessToken");
+        localStorage.removeItem("userEmail");
+        localStorage.removeItem("lastLogin");
         showLogin();
         return [];
       }
@@ -133,6 +138,8 @@ async function processAllEmails(emails, limit = 10) {
       if (res.status === 401) {
         showError("Session expired. Please log in again.");
         localStorage.removeItem("accessToken");
+        localStorage.removeItem("userEmail");
+        localStorage.removeItem("lastLogin");
         showLogin();
         return;
       }
@@ -214,6 +221,8 @@ async function fetchEvents(emailId) {
     if (res.status === 401) {
       showError("Session expired. Please log in again.");
       localStorage.removeItem("accessToken");
+      localStorage.removeItem("userEmail");
+      localStorage.removeItem("lastLogin");
       showLogin();
       return;
     }
@@ -300,7 +309,7 @@ window.onload = function () {
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
       scope: "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.events",
-      access_type: "offline", // Ensure refresh token availability
+      access_type: "offline",
       callback: (tokenResponse) => {
         accessToken = tokenResponse.access_token;
         localStorage.setItem("accessToken", accessToken);
