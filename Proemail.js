@@ -91,8 +91,14 @@ async function fetchEmails(retries = 3, delay = 1000) {
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
+      const userEmail = localStorage.getItem("userEmail");
+
       const res = await fetch(`${BACKEND_URL}/fetch_emails`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "X-User-Email": userEmail,
+        },
         credentials: "include",
       });
 
