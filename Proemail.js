@@ -93,6 +93,7 @@ async function fetchEmails(retries = 3, delay = 1000) {
     try {
       const res = await fetch(`${BACKEND_URL}/fetch_emails`, {
         headers: { Authorization: `Bearer ${accessToken}` },
+        credentials: "include",
       });
 
       if (res.status === 401) {
@@ -135,6 +136,7 @@ async function processAllEmails(emails, limit = 10) {
           Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ emailId: email.id }),
+        credentials: "include",
       });
 
       if (res.status === 401) {
@@ -170,6 +172,7 @@ async function processAllEmails(emails, limit = 10) {
                 Authorization: `Bearer ${accessToken}`,
               },
               body: JSON.stringify(event),
+              credentials: "include",
             });
 
             if (response.ok) {
@@ -218,6 +221,7 @@ async function fetchEvents(emailId) {
         Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({ emailId }),
+      credentials: "include",
     });
 
     if (res.status === 401) {
