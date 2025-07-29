@@ -63,7 +63,7 @@ async function handleCredentialResponse(response) {
 
         try {
           const emails = await fetchEmails();
-          await processAllEmails(emails, 10);
+          await processAllEmails(emails, 1);
         } catch (err) {
           console.error("Initial email fetch failed:", err);
           showError("Failed to load emails. Please try again later.");
@@ -124,7 +124,7 @@ async function fetchEmails(retries = 3, delay = 1000) {
   }
 }
 
-async function processAllEmails(emails, limit = 10) {
+async function processAllEmails(emails, limit = 1) {
   const eventsList = document.getElementById("events-list");
   const processedEmails = new Set();
   let count = 0;
@@ -330,7 +330,7 @@ window.onload = function () {
     });
 
     startTokenRefreshInterval();
-    fetchEmails().then((emails) => processAllEmails(emails, 10));
+    fetchEmails().then((emails) => processAllEmails(emails, 1));
   } else {
     google.accounts.id.initialize({
       client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
