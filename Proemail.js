@@ -251,10 +251,100 @@ function renderEvents(events) {
   updateSummary(events);
 }
 
-async function fetchEvents(emailId) { /* unchanged */ }
-function updateSummary(events) { /* unchanged */ }
-function setupSearch() { /* unchanged */ }
-function showError(message) { /* unchanged */ }
+async function fetchEvents(emailId) {
+  const eventsList = document.getElementById("events-list");
+  const eventsLoading = document.getElementById("events-loading");
+  const eventsError = document.getElementById("events-error");
+
+  eventsLoading.style.display = "block";
+  eventsError.style.display = "none";
+
+  try {
+    const res = await fetch(`${BACKEND_URL}/process_emails`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ emailId }),
+      credentials: "include",
+    });
+
+    if (res.status === 401) {
+      showError("Session expired. Please log in again.");
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("userEmail");
+      localStorage.removeItem("lastLogin");
+      showLogin();
+      return;
+    }
+
+    if (!res.ok) throw new Error(`Event extraction failed: ${await res.text()}`);
+    const events = await res.json();
+
+    eventsList.innerHTML = "";
+    events.forEach((event) => {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <div style="color: #8b5cf6; font-weight: bold;">${event.type || "Event"}</div>
+        <h2>${event.event_name || "No Title"}</h2>
+        <p>📅 ${event.date || "N/A"}</p>
+        <p>⏰ ${event.time || "N/A"}</p>
+        <p>📍 ${event.venue || "N/A"}</p>
+      `;
+      eventsList.appendChild(card);
+    });
+    updateSummary(events);
+  } catch (err) {
+    console.error("Fetch events error:", err);
+    eventsError.style.display = "block";
+    eventsError.textContent = "No events found for this email.";
+  } finally {
+    eventsLoading.style.display = "none";
+  }
+}
+
+function updateSummary(events) {
+  const total = events.length;
+  const today = new Date();
+  const weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - today.getDay());
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+
+  const thisWeek = events.filter((ev) => {
+    const dt = new Date(ev.date);
+    return dt >= weekStart && dt <= weekEnd;
+  }).length;
+
+  const attendees = events.reduce((sum, ev) => sum + (parseInt(ev.attendees) || 0), 0);
+
+  document.getElementById("total-events").textContent = total;
+  document.getElementById("this-week-events").textContent = thisWeek;
+  document.getElementById("total-attendees").textContent = attendees;
+  document.getElementById("upcoming-count").textContent = total;
+  document.getElementById("attended-count").textContent = 0;
+  document.getElementById("missed-count").textContent = 0;
+}
+
+function setupSearch() {
+  const input = document.getElementById("search-events");
+  input.addEventListener("input", (e) => {
+    const val = e.target.value.toLowerCase();
+    const cards = document.querySelectorAll(".events .card");
+    cards.forEach((c) => {
+      const title = c.querySelector("h2").textContent.toLowerCase();
+      c.style.display = title.includes(val) ? "block" : "none";
+    });
+  });
+}
+function showError(message) {
+  const emailError = document.getElementById("email-error");
+  emailError.style.display = "block";
+  emailError.textContent = message;
+}
+
 
 window.onload = function () {
   setupSearch();
@@ -267,7 +357,16 @@ window.onload = function () {
     accessToken = savedAccessToken;
     showLogout();
 
-    tokenClient = google.accounts.oauth2.initTokenClient({ /* unchanged */ });
+     tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
+      scope: "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.events",
+      access_type: "offline",
+      prompt: "consent",
+      callback: (tokenResponse) => {
+        accessToken = tokenResponse.access_token;
+        localStorage.setItem("accessToken", accessToken);
+      },
+    });
     startTokenRefreshInterval();
 
     // process new unread emails
@@ -275,14 +374,66 @@ window.onload = function () {
     // then load and render all persisted events
     fetchAllEvents();
   } else {
-    google.accounts.id.initialize({ /* unchanged */ });
-    google.accounts.id.renderButton(/* unchanged */);
+    google.accounts.id.initialize({
+      client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
+      callback: handleCredentialResponse,
+      auto_select: false,
+    });
+
+    google.accounts.id.renderButton(document.getElementById("login-button"), {
+      theme: "outline",
+      size: "large",
+      width: 300,
+    });
+
     google.accounts.id.prompt();
     showLogin();
   }
 
-  document.getElementById("logoutButton").addEventListener("click", () => { /* unchanged */ });
+  document.getElementById("logoutButton").addEventListener("click", () => {
+    const email = localStorage.getItem("userEmail");
+
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("userEmail");
+    localStorage.removeItem("lastLogin");
+    accessToken = null;
+
+    document.getElementById("events-list").innerHTML = "";
+    document.getElementById("total-events").textContent = 0;
+    document.getElementById("this-week-events").textContent = 0;
+    document.getElementById("total-attendees").textContent = 0;
+    document.getElementById("upcoming-count").textContent = 0;
+    document.getElementById("attended-count").textContent = 0;
+    document.getElementById("missed-count").textContent = 0;
+
+    showLogin();
+
+    google.accounts.id.initialize({
+      client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
+      callback: handleCredentialResponse,
+      auto_select: false,
+    });
+
+    google.accounts.id.renderButton(document.getElementById("login-button"), {
+      theme: "outline",
+      size: "large",
+      width: 300,
+    });
+
+    if (email) {
+      google.accounts.id.revoke(email, () => {
+        console.log("✅ Google session revoked");
+      });
+    }
+  });
 };
 
-function showLogin() { /* unchanged */ }
-function showLogout() { /* unchanged */ }
+function showLogin() {
+  document.getElementById("loginDiv").style.display = "block";
+  document.getElementById("logoutButton").style.display = "none";
+}
+
+function showLogout() {
+  document.getElementById("loginDiv").style.display = "none";
+  document.getElementById("logoutButton").style.display = "inline-block";
+}
