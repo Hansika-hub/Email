@@ -61,7 +61,7 @@ async function handleCredentialResponse(response) {
 
         try {
           const emails = await fetchEmails();
-          await processAllEmails(emails, 1);
+          await processAllEmails(emails, 10);
         } catch (err) {
           console.error("Initial email fetch failed:", err);
           showError("Failed to load emails. Please try again later.");
@@ -120,7 +120,7 @@ async function fetchEmails(retries = 3, delay = 1000) {
   }
 }
 
-async function processAllEmails(emails, limit = 1) {
+async function processAllEmails(emails, limit = 10) {
   const eventsList = document.getElementById("events-list");
   const processedEmails = new Set();
   let count = 0;
@@ -370,7 +370,7 @@ window.onload = function () {
     startTokenRefreshInterval();
 
     // process new unread emails
-    fetchEmails().then(emails => processAllEmails(emails, 1));
+    fetchEmails().then(emails => processAllEmails(emails, 10));
     // then load and render all persisted events
     fetchAllEvents();
   } else {
@@ -437,3 +437,4 @@ function showLogout() {
   document.getElementById("loginDiv").style.display = "none";
   document.getElementById("logoutButton").style.display = "inline-block";
 }
+
