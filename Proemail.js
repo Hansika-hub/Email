@@ -1,244 +1,142 @@
+// Sidebar toggle
 function toggleSidebar() {
   document.getElementById("sidebar").classList.toggle("open");
   document.getElementById("overlay").classList.toggle("show");
 }
 
 const BACKEND_URL = "https://email-backend-bu9l.onrender.com";
-let accessToken = null;
-let tokenClient = null;
+let accessToken = localStorage.getItem("accessToken") || null;
 
-async function handleCredentialResponse(response) {
+// On load, fetch events if already logged in
+window.onload = function () {
+  setupSearch();
+
+  if (accessToken) {
+    fetchAllUnreadEmails();
+  }
+
+  try {
+    google.accounts.id.initialize({
+      client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
+      callback: handleCredentialResponse,
+      auto_select: true,
+      cancel_on_tap_outside: true,
+      itp_support: true,
+    });
+
+    const loginButton = document.getElementById("login-button");
+    if (loginButton) {
+      google.accounts.id.renderButton(loginButton, {
+        theme: "outline",
+        size: "large",
+        width: 300,
+      });
+      google.accounts.id.prompt(); // optional One Tap
+    }
+  } catch (err) {
+    console.error("GSI Initialization failed:", err);
+    showError("Google Sign-In init failed.");
+  }
+};
+
+// Handle Google Login
+function handleCredentialResponse(response) {
   const idToken = response.credential;
 
+  fetch(`${BACKEND_URL}/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token: idToken }),
+  })
+    .then((res) => res.json())
+    .then(() => {
+      google.accounts.oauth2.initTokenClient({
+        client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
+        scope: "https://www.googleapis.com/auth/gmail.readonly",
+        callback: (tokenResponse) => {
+          accessToken = tokenResponse.access_token;
+          localStorage.setItem("accessToken", accessToken);
+          fetchAllUnreadEmails();
+        },
+      }).requestAccessToken();
+    })
+    .catch((err) => {
+      console.error("Login failed:", err);
+      showError("Login failed. Try again.");
+    });
+}
+
+// Fetch all unread emails and extract events
+async function fetchAllUnreadEmails() {
   try {
-    const res = await fetch(`${BACKEND_URL}/`, {
+    const res = await fetch(`${BACKEND_URL}/fetch_emails`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const emails = await res.json();
+
+    const promises = emails.map((email) => fetchEvents(email.id));
+    const results = await Promise.all(promises);
+    const allEvents = results.flat().filter(ev => ev);
+
+    renderEvents(allEvents);
+    updateSummary(allEvents);
+    scheduleNotifications(allEvents);
+  } catch (err) {
+    console.error("Fetching emails failed:", err);
+    showError("Failed to fetch emails.");
+  }
+}
+
+// Extract events from one email
+async function fetchEvents(emailId) {
+  try {
+    const res = await fetch(`${BACKEND_URL}/process_emails`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: idToken }),
-      credentials: "include"
-    });
-
-    if (!res.ok) throw new Error(`ID token verification failed: ${await res.text()}`);
-    const data = await res.json();
-
-    localStorage.setItem("userEmail", data.user);
-    localStorage.setItem("lastLogin", Date.now().toString());
-
-    tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
-      scope: "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.events",
-      access_type: "offline",
-      prompt: "consent",
-      callback: async (tokenResponse) => {
-        if (tokenResponse.error) {
-          console.error("Access token error:", tokenResponse.error);
-          showError("Authentication failed. Please try again.");
-          return;
-        }
-
-        accessToken = tokenResponse.access_token;
-        localStorage.setItem("accessToken", accessToken);
-
-        // Store refresh token if present
-        if (tokenResponse.refresh_token) {
-          try {
-            const storeRes = await fetch(`${BACKEND_URL}/store-tokens`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                userEmail: localStorage.getItem("userEmail"),
-                refreshToken: tokenResponse.refresh_token,
-              }),
-            });
-            if (!storeRes.ok) console.error("Failed to store refresh token:", await storeRes.text());
-          } catch (err) {
-            console.error("Failed to store refresh token:", err);
-          }
-        }
-
-        showLogout();
-        startTokenRefreshInterval();
-
-        try {
-          const emails = await fetchEmails();
-          await processAllEmails(emails, 10);
-        } catch (err) {
-          console.error("Initial email fetch failed:", err);
-          showError("Failed to load emails. Please try again later.");
-        }
-      },
-    });
-
-    tokenClient.requestAccessToken();
-  } catch (err) {
-    console.error("Login failed:", err);
-    showError("Login failed. Please try again.");
-  }
-}
-
-function startTokenRefreshInterval() {
-  setInterval(() => {
-    if (tokenClient && localStorage.getItem("userEmail")) {
-      tokenClient.requestAccessToken();
-    }
-  }, 30 * 60 * 1000);
-}
-
-async function fetchEmails(retries = 3, delay = 1000) {
-  const emailError = document.getElementById("email-error");
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      const userEmail = localStorage.getItem("userEmail");
-      const res = await fetch(`${BACKEND_URL}/fetch_emails`, {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${accessToken}`,
-          "X-User-Email": userEmail,
-        },
-        credentials: "include",
-      });
-
-      if (res.status === 401) {
-        showError("Session expired. Please log in again.");
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("userEmail");
-        localStorage.removeItem("lastLogin");
-        showLogin();
-        return [];
-      }
-
-      if (!res.ok) throw new Error(`Email fetch failed: ${await res.text()}`);
-      return await res.json();
-    } catch (err) {
-      console.error(`Fetch emails attempt ${attempt} failed:`, err);
-      if (attempt === retries) {
-        showError("Failed to fetch emails after multiple attempts.");
-        return [];
-      }
-      await new Promise(r => setTimeout(r, delay));
-    }
-  }
-}
-
-async function processAllEmails(emails, limit = 10) {
-  const eventsList = document.getElementById("events-list");
-  const processedEmails = new Set();
-  let count = 0;
-
-  for (let email of emails) {
-    if (count >= limit) break;
-    if (processedEmails.has(email.id)) continue;
-    processedEmails.add(email.id);
-
-    try {
-      const res = await fetch(`${BACKEND_URL}/process_emails`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ emailId: email.id }),
-        credentials: "include",
-      });
-
-      if (res.status === 401) {
-        showError("Session expired. Please log in again.");
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("userEmail");
-        localStorage.removeItem("lastLogin");
-        showLogin();
-        return;
-      }
-
-      if (!res.ok) throw new Error(`Event extraction failed: ${await res.text()}`);
-      const events = await res.json();
-
-      if (events.length > 0) {
-        for (let event of events) {
-          const card = document.createElement("div");
-          card.className = "card";
-          card.innerHTML = `
-            <div style="color: #8b5cf6; font-weight: bold;">${event.type || "Event"}</div>
-            <h2>${event.event_name || "No Title"}</h2>
-            <p>📅 ${event.date || "N/A"}</p>
-            <p>⏰ ${event.time || "N/A"}</p>
-            <p>📍 ${event.venue || "N/A"}</p>
-          `;
-          eventsList.appendChild(card);
-
-          try {
-            const response = await fetch(`${BACKEND_URL}/add_to_calendar`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${accessToken}`,
-              },
-              body: JSON.stringify(event),
-              credentials: "include",
-            });
-
-            if (response.ok) {
-              const statusDiv = document.createElement("div");
-              statusDiv.textContent = "✅ Added to Calendar";
-              statusDiv.style.color = "green";
-              statusDiv.style.fontSize = "0.9rem";
-              statusDiv.style.marginTop = "5px";
-              statusDiv.style.fontWeight = "bold";
-              card.appendChild(statusDiv);
-            } else {
-              console.error("❌ Failed to add to calendar:", await response.text());
-            }
-          } catch (calendarErr) {
-            console.error("❌ Calendar add failed:", calendarErr);
-          }
-        }
-        updateSummary(events);
-      }
-      count++;
-    } catch (err) {
-      console.error(`Error processing email ${email.id}:`, err);
-      continue;
-    }
-  }
-
-  console.log(`✅ Processed ${count} email(s) for events`);
-}
-
-/**
- * Fetch all persisted events from the backend and render them
- */
-async function fetchAllEvents() {
-  const eventsList = document.getElementById("events-list");
-  eventsList.innerHTML = "";
-
-  try {
-    const res = await fetch(`${BACKEND_URL}/events`, {
-      method: "GET",
+      //method: "GET",
       headers: {
-        "Authorization": `Bearer ${accessToken}`,
-        "X-User-Email": localStorage.getItem("userEmail"),
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
       },
-      credentials: "include"
+      body: JSON.stringify({ emailId }),
     });
 
-    if (!res.ok) throw new Error(`Failed to load events: ${await res.text()}`);
-    const events = await res.json();
-    renderEvents(events);
+    if (!res.ok) return [];
+
+    return await res.json();
   } catch (err) {
-    console.error("❌ fetchAllEvents error:", err);
+    console.error(`Error processing email ${emailId}:`, err);
+    return [];
   }
 }
 
-/**
- * Render events array into cards and update summary
- */
+// Render events with checkbox
 function renderEvents(events) {
-  const eventsList = document.getElementById("events-list");
-  eventsList.innerHTML = "";
+  const list = document.getElementById("events-list");
+  list.innerHTML = "";
 
-  for (let event of events) {
+  const now = new Date();
+  const upcoming = [];
+  const completed = JSON.parse(localStorage.getItem("completedEvents") || "[]");
+  const missed = [];
+
+  events.forEach((event) => {
+    const dateStr = `${event.date || ""} ${event.time || ""}`;
+    const eventTime = new Date(dateStr);
+    const isCompleted = completed.includes(event.event_name);
+
+    let category = "upcoming";
+    if (isCompleted) category = "completed";
+    else if (eventTime < now) category = "missed";
+    else upcoming.push(event);
+
     const card = document.createElement("div");
     card.className = "card";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = isCompleted;
+    checkbox.addEventListener("change", () => handleStatusChange(event, checkbox.checked));
+
     card.innerHTML = `
       <div style="color: #8b5cf6; font-weight: bold;">${event.type || "Event"}</div>
       <h2>${event.event_name || "No Title"}</h2>
@@ -246,88 +144,23 @@ function renderEvents(events) {
       <p>⏰ ${event.time || "N/A"}</p>
       <p>📍 ${event.venue || "N/A"}</p>
     `;
-    eventsList.appendChild(card);
-  }
-  updateSummary(events);
+
+    card.prepend(checkbox);
+    list.appendChild(card);
+  });
 }
 
-async function fetchEvents(emailId) {
-  const eventsList = document.getElementById("events-list");
-  const eventsLoading = document.getElementById("events-loading");
-  const eventsError = document.getElementById("events-error");
+// Handle marking event as complete
+function handleStatusChange(event, isComplete) {
+  const completed = new Set(JSON.parse(localStorage.getItem("completedEvents") || "[]"));
+  if (isComplete) completed.add(event.event_name);
+  else completed.delete(event.event_name);
 
-  eventsLoading.style.display = "block";
-  eventsError.style.display = "none";
-
-  try {
-    const res = await fetch(`${BACKEND_URL}/process_emails`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({ emailId }),
-      credentials: "include",
-    });
-
-    if (res.status === 401) {
-      showError("Session expired. Please log in again.");
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("userEmail");
-      localStorage.removeItem("lastLogin");
-      showLogin();
-      return;
-    }
-
-    if (!res.ok) throw new Error(`Event extraction failed: ${await res.text()}`);
-    const events = await res.json();
-
-    eventsList.innerHTML = "";
-    events.forEach((event) => {
-      const card = document.createElement("div");
-      card.className = "card";
-      card.innerHTML = `
-        <div style="color: #8b5cf6; font-weight: bold;">${event.type || "Event"}</div>
-        <h2>${event.event_name || "No Title"}</h2>
-        <p>📅 ${event.date || "N/A"}</p>
-        <p>⏰ ${event.time || "N/A"}</p>
-        <p>📍 ${event.venue || "N/A"}</p>
-      `;
-      eventsList.appendChild(card);
-    });
-    updateSummary(events);
-  } catch (err) {
-    console.error("Fetch events error:", err);
-    eventsError.style.display = "block";
-    eventsError.textContent = "No events found for this email.";
-  } finally {
-    eventsLoading.style.display = "none";
-  }
+  localStorage.setItem("completedEvents", JSON.stringify([...completed]));
+  fetchAllUnreadEmails(); // re-render everything
 }
 
-function updateSummary(events) {
-  const total = events.length;
-  const today = new Date();
-  const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - today.getDay());
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 6);
-
-  const thisWeek = events.filter((ev) => {
-    const dt = new Date(ev.date);
-    return dt >= weekStart && dt <= weekEnd;
-  }).length;
-
-  const attendees = events.reduce((sum, ev) => sum + (parseInt(ev.attendees) || 0), 0);
-
-  document.getElementById("total-events").textContent = total;
-  document.getElementById("this-week-events").textContent = thisWeek;
-  document.getElementById("total-attendees").textContent = attendees;
-  document.getElementById("upcoming-count").textContent = total;
-  document.getElementById("attended-count").textContent = 0;
-  document.getElementById("missed-count").textContent = 0;
-}
-
+// Setup event search
 function setupSearch() {
   const input = document.getElementById("search-events");
   input.addEventListener("input", (e) => {
@@ -339,102 +172,67 @@ function setupSearch() {
     });
   });
 }
-function showError(message) {
-  const emailError = document.getElementById("email-error");
-  emailError.style.display = "block";
-  emailError.textContent = message;
-}
 
+// Notification scheduler
+function scheduleNotifications(events) {
+  if (!("Notification" in window)) return;
 
-window.onload = function () {
-  setupSearch();
+  Notification.requestPermission().then((permission) => {
+    if (permission !== "granted") return;
 
-  const userEmail        = localStorage.getItem("userEmail");
-  const lastLogin        = parseInt(localStorage.getItem("lastLogin") || "0");
-  const savedAccessToken = localStorage.getItem("accessToken");
+    events.forEach((event) => {
+      const dateTimeStr = `${event.date} ${event.time}`;
+      const eventTime = new Date(dateTimeStr);
+      const now = new Date();
 
-  if (userEmail && savedAccessToken && Date.now() - lastLogin < 7 * 24 * 60 * 60 * 1000) {
-    accessToken = savedAccessToken;
-    showLogout();
-
-     tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
-      scope: "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.events",
-      access_type: "offline",
-      prompt: "consent",
-      callback: (tokenResponse) => {
-        accessToken = tokenResponse.access_token;
-        localStorage.setItem("accessToken", accessToken);
-      },
-    });
-    startTokenRefreshInterval();
-
-    // process new unread emails
-    fetchEmails().then(emails => processAllEmails(emails, 10));
-    // then load and render all persisted events
-    fetchAllEvents();
-  } else {
-    google.accounts.id.initialize({
-      client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
-      callback: handleCredentialResponse,
-      auto_select: false,
-    });
-
-    google.accounts.id.renderButton(document.getElementById("login-button"), {
-      theme: "outline",
-      size: "large",
-      width: 300,
-    });
-
-    google.accounts.id.prompt();
-    showLogin();
-  }
-
-  document.getElementById("logoutButton").addEventListener("click", () => {
-    const email = localStorage.getItem("userEmail");
-
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("userEmail");
-    localStorage.removeItem("lastLogin");
-    accessToken = null;
-
-    document.getElementById("events-list").innerHTML = "";
-    document.getElementById("total-events").textContent = 0;
-    document.getElementById("this-week-events").textContent = 0;
-    document.getElementById("total-attendees").textContent = 0;
-    document.getElementById("upcoming-count").textContent = 0;
-    document.getElementById("attended-count").textContent = 0;
-    document.getElementById("missed-count").textContent = 0;
-
-    showLogin();
-
-    google.accounts.id.initialize({
-      client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
-      callback: handleCredentialResponse,
-      auto_select: false,
-    });
-
-    google.accounts.id.renderButton(document.getElementById("login-button"), {
-      theme: "outline",
-      size: "large",
-      width: 300,
-    });
-
-    if (email) {
-      google.accounts.id.revoke(email, () => {
-        console.log("✅ Google session revoked");
+      const times = [60, 15, 5]; // minutes before
+      times.forEach((min) => {
+        const delay = eventTime - now - min * 60 * 1000;
+        if (delay > 0) {
+          setTimeout(() => {
+            new Notification(`Upcoming Event: ${event.event_name}`, {
+              body: `📍 ${event.venue || "Unknown"}\n⏰ ${event.time || "Unknown"}`,
+              icon: "/favicon.png",
+            });
+          }, delay);
+        }
       });
-    }
+    });
   });
-};
-
-function showLogin() {
-  document.getElementById("loginDiv").style.display = "block";
-  document.getElementById("logoutButton").style.display = "none";
 }
 
-function showLogout() {
-  document.getElementById("loginDiv").style.display = "none";
-  document.getElementById("logoutButton").style.display = "inline-block";
+// Update dashboard summary
+function updateSummary(events) {
+  const today = new Date();
+  const weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - today.getDay());
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+
+  const total = events.length;
+  const thisWeek = events.filter((ev) => {
+    const dt = new Date(`${ev.date} ${ev.time}`);
+    return dt >= weekStart && dt <= weekEnd;
+  }).length;
+
+  const completed = JSON.parse(localStorage.getItem("completedEvents") || "[]").length;
+  const missed = events.filter((ev) => {
+    const dt = new Date(`${ev.date} ${ev.time}`);
+    return dt < today && !completed.includes(ev.event_name);
+  }).length;
+  const upcoming = total - completed - missed;
+
+  document.getElementById("total-events").textContent = total;
+  document.getElementById("this-week-events").textContent = thisWeek;
+  document.getElementById("total-attendees").textContent = total;
+  document.getElementById("upcoming-count").textContent = upcoming;
+  document.getElementById("attended-count").textContent = completed;
+  document.getElementById("missed-count").textContent = missed;
 }
 
+// Error handler
+function showError(message) {
+  const errBox = document.getElementById("email-error");
+  errBox.style.display = "block";
+  errBox.textContent = message;
+}
