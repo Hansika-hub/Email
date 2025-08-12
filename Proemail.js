@@ -92,7 +92,7 @@ async function fetchEvents(emailId) {
   try {
     const res = await fetch(`${BACKEND_URL}/process_emails`, {
       method: "POST",
-      //method: "GET",
+      method: "GET",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${accessToken}`,
@@ -236,3 +236,4 @@ function showError(message) {
   errBox.style.display = "block";
   errBox.textContent = message;
 }
+
