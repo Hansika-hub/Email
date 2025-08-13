@@ -69,45 +69,49 @@ function handleCredentialResponse(response) {
 // Fetch all unread emails and extract events
 async function fetchAllUnreadEmails() {
   try {
-    const res = await fetch(`${BACKEND_URL}/fetch_emails`, {
+    const res = await fetch(`${BACKEND_URL}/process_emails`, {
+      method: "GET",
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-    const emails = await res.json();
 
-    const promises = emails.map((email) => fetchEvents(email.id));
-    const results = await Promise.all(promises);
-    const allEvents = results.flat().filter(ev => ev);
+    if (!res.ok) {
+      showError("Failed to process emails.");
+      return;
+    }
 
+    const allEvents = await res.json();
     renderEvents(allEvents);
     updateSummary(allEvents);
     scheduleNotifications(allEvents);
+
   } catch (err) {
     console.error("Fetching emails failed:", err);
     showError("Failed to fetch emails.");
   }
 }
 
+
 // Extract events from one email
-async function fetchEvents(emailId) {
-  try {
-    const res = await fetch(`${BACKEND_URL}/process_emails`, {
-      method: "POST",
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({ emailId }),
-    });
+// async function fetchEvents(emailId) {
+//   try {
+//     const res = await fetch(`${BACKEND_URL}/process_emails`, {
+//       method: "POST",
+//       method: "GET",
+//       headers: {
+//         "Content-Type": "application/json",
+//         Authorization: `Bearer ${accessToken}`,
+//       },
+//       body: JSON.stringify({ emailId }),
+//     });
 
-    if (!res.ok) return [];
+//     if (!res.ok) return [];
 
-    return await res.json();
-  } catch (err) {
-    console.error(`Error processing email ${emailId}:`, err);
-    return [];
-  }
-}
+//     return await res.json();
+//   } catch (err) {
+//     console.error(`Error processing email ${emailId}:`, err);
+//     return [];
+//   }
+// }
 
 // Render events with checkbox
 function renderEvents(events) {
@@ -236,4 +240,5 @@ function showError(message) {
   errBox.style.display = "block";
   errBox.textContent = message;
 }
+
 
