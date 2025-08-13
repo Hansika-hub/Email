@@ -5,7 +5,7 @@
   font-family: 'Inter', sans-serif;
 }
 body {
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 50%, #dee2e6 100%);
+  background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 50%, #ede9fe 100%);
   color: #333;
   min-height: 100vh;
   overflow-x: hidden;
@@ -29,7 +29,7 @@ body {
 .sidebar .header {
   padding: 20px;
   font-size: 1.5rem;
-  background: linear-gradient(to bottom right, violet, blue);
+  background: linear-gradient(135deg, #c4b5fd 0%, #8b5cf6 100%);
   color: white;
   text-align: center;
 }
@@ -68,7 +68,7 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 1rem;
-  background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+  background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%);
   color: white;
   border-radius: 8px;
   margin-bottom: 1rem;
@@ -200,5 +200,82 @@ footer {
 #events-list {
   max-height: 80vh;
   overflow-y: auto;
+}
+
+/* Modal styles for Add Event */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+}
+
+.modal-overlay.show {
+  display: flex;
+}
+
+.modal {
+  width: 95%;
+  max-width: 480px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  padding: 20px;
+}
+
+.modal h3 {
+  margin-bottom: 12px;
+  color: #4c1d95;
+}
+
+.modal .form-row {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.modal label {
+  font-size: 0.9rem;
+  color: #374151;
+}
+
+.modal input, .modal select {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  outline: none;
+}
+
+.modal input:focus, .modal select:focus {
+  border-color: #a78bfa;
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.25);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  color: white;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: #4b5563;
 }
 

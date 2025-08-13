@@ -38,6 +38,9 @@ window.onload = function () {
     console.error("GSI Initialization failed:", err);
     showError("Google Sign-In init failed.");
   }
+
+  // Enable and wire Add Event button and modal
+  initializeAddEventFlow();
 };
 
 // Update login/logout UI based on authentication state
@@ -313,5 +316,100 @@ function showError(message) {
   errBox.style.display = "block";
   errBox.textContent = message;
 }
+
+// Merge fetched events with user-added custom events from localStorage
+function getAllEventsWithCustom(fetchedEvents) {
+  const custom = JSON.parse(localStorage.getItem("customEvents") || "[]");
+  return [...custom, ...fetchedEvents];
+}
+
+// Initialize Add Event modal flow
+function initializeAddEventFlow() {
+  const addBtn = document.getElementById("add-event-btn");
+  const modal = document.getElementById("add-event-modal");
+  const cancelBtn = document.getElementById("cancel-add-event");
+  const form = document.getElementById("add-event-form");
+
+  if (!addBtn || !modal || !cancelBtn || !form) return;
+
+  // Ensure button is enabled and styled
+  addBtn.removeAttribute("disabled");
+
+  const openModal = () => {
+    modal.classList.add("show");
+    modal.setAttribute("aria-hidden", "false");
+  };
+
+  const closeModal = () => {
+    modal.classList.remove("show");
+    modal.setAttribute("aria-hidden", "true");
+    form.reset();
+  };
+
+  addBtn.addEventListener("click", openModal);
+  cancelBtn.addEventListener("click", closeModal);
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) closeModal();
+  });
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const name = document.getElementById("event-name").value.trim();
+    const type = document.getElementById("event-type").value.trim();
+    const date = document.getElementById("event-date").value;
+    const time = document.getElementById("event-time").value;
+    const venue = document.getElementById("event-venue").value.trim();
+
+    if (!name || !date || !time) {
+      alert("Please fill in the required fields: name, date, time.");
+      return;
+    }
+
+    const newEvent = {
+      event_name: name,
+      type: type || "Custom",
+      date,
+      time,
+      venue: venue || "",
+      isCustom: true,
+    };
+
+    const existing = JSON.parse(localStorage.getItem("customEvents") || "[]");
+    existing.unshift(newEvent);
+    localStorage.setItem("customEvents", JSON.stringify(existing));
+
+    // Re-render events combining custom + fetched if logged in, else just custom
+    if (accessToken) {
+      // Attempt to merge with latest fetched events by reusing the last known list on the page
+      // If we don't have it, just render custom for now; next fetch will merge
+      const currentCards = document.querySelectorAll("#events-list .card h2");
+      const currentEventNames = Array.from(currentCards).map((h) => h.textContent);
+      // No reliable reconstruction of fetched event objects here; trigger a refetch if logged in
+      fetchAllUnreadEmails();
+    } else {
+      renderEvents(getAllEventsWithCustom([]));
+      updateSummary(getAllEventsWithCustom([]));
+    }
+
+    // Optional: schedule notification for the custom event
+    scheduleNotifications([newEvent]);
+
+    closeModal();
+  });
+}
+
+// Override render pipeline to include custom events when we fetch
+const originalRenderEvents = renderEvents;
+renderEvents = function(events) {
+  const merged = getAllEventsWithCustom(events || []);
+  originalRenderEvents(merged);
+};
+
+// Override updateSummary to use combined list when called after fetch
+const originalUpdateSummary = updateSummary;
+updateSummary = function(events) {
+  const merged = getAllEventsWithCustom(events || []);
+  originalUpdateSummary(merged);
+};
 
 
