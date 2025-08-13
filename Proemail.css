@@ -132,6 +132,17 @@ body {
   color: #6c757d;
   font-size: 0.85rem;
 }
+.delete-btn {
+  float: right;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  color: #9ca3af;
+}
+.delete-btn:hover {
+  color: #ef4444;
+}
 .menu-btn {
   font-size: 24px;
   background: none;
