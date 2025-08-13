@@ -447,11 +447,13 @@ renderEvents = function(events) {
   originalRenderEvents(merged);
 };
 
-// Override updateSummary to use combined list when called after fetch
+// Override updateSummary to use combined list and exclude deleted events
 const originalUpdateSummary = updateSummary;
 updateSummary = function(events) {
   const merged = getAllEventsWithCustom(events || []);
-  originalUpdateSummary(merged);
+  const deleted = JSON.parse(localStorage.getItem("deletedEvents") || "[]");
+  const filtered = merged.filter((ev) => !deleted.includes(ev.event_name));
+  originalUpdateSummary(filtered);
 };
 
 
