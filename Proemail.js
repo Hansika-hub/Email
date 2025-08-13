@@ -10,6 +10,7 @@ let accessToken = localStorage.getItem("accessToken") || null;
 // On load, fetch events if already logged in
 window.onload = function () {
   setupSearch();
+  updateLoginUI(); // Update UI based on login state
 
   if (accessToken) {
     fetchAllUnreadEmails();
@@ -39,6 +40,49 @@ window.onload = function () {
   }
 };
 
+// Update login/logout UI based on authentication state
+function updateLoginUI() {
+  const loginDiv = document.getElementById("loginDiv");
+  const logoutButton = document.getElementById("logoutButton");
+  
+  if (accessToken) {
+    // User is logged in
+    if (loginDiv) loginDiv.style.display = "none";
+    if (logoutButton) logoutButton.style.display = "block";
+  } else {
+    // User is not logged in
+    if (loginDiv) loginDiv.style.display = "block";
+    if (logoutButton) logoutButton.style.display = "none";
+  }
+}
+
+// Handle logout
+function logout() {
+  accessToken = null;
+  localStorage.removeItem("accessToken");
+  updateLoginUI();
+  
+  // Clear all data
+  document.getElementById("events-list").innerHTML = "";
+  document.getElementById("email-list").innerHTML = "";
+  document.getElementById("email-error").style.display = "none";
+  
+  // Reset counters
+  document.getElementById("total-events").textContent = "0";
+  document.getElementById("this-week-events").textContent = "0";
+  document.getElementById("total-attendees").textContent = "0";
+  document.getElementById("upcoming-count").textContent = "0";
+  document.getElementById("attended-count").textContent = "0";
+  document.getElementById("missed-count").textContent = "0";
+  
+  // Reinitialize Google Sign-In
+  try {
+    google.accounts.id.prompt();
+  } catch (err) {
+    console.error("Failed to reinitialize Google Sign-In:", err);
+  }
+}
+
 // Handle Google Login
 function handleCredentialResponse(response) {
   const idToken = response.credential;
@@ -56,6 +100,7 @@ function handleCredentialResponse(response) {
         callback: (tokenResponse) => {
           accessToken = tokenResponse.access_token;
           localStorage.setItem("accessToken", accessToken);
+          updateLoginUI(); // Update UI after successful login
           fetchAllUnreadEmails();
         },
       }).requestAccessToken();
@@ -69,17 +114,24 @@ function handleCredentialResponse(response) {
 // Fetch all unread emails and extract events
 async function fetchAllUnreadEmails() {
   try {
+    // Show loading state
+    const emailError = document.getElementById("email-error");
+    emailError.style.display = "none";
+    
     const res = await fetch(`${BACKEND_URL}/process_emails`, {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 
     if (!res.ok) {
-      showError("Failed to process emails.");
-      return;
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     }
 
     const allEvents = await res.json();
+    
+    // Clear any previous errors
+    emailError.style.display = "none";
+    
     renderEvents(allEvents);
     updateSummary(allEvents);
     scheduleNotifications(allEvents);
@@ -119,19 +171,19 @@ function renderEvents(events) {
   list.innerHTML = "";
 
   const now = new Date();
-  const upcoming = [];
   const completed = JSON.parse(localStorage.getItem("completedEvents") || "[]");
-  const missed = [];
 
   events.forEach((event) => {
-    const dateStr = `${event.date || ""} ${event.time || ""}`;
-    const eventTime = new Date(dateStr);
+    let eventTime = null;
+    if (event.date && event.time) {
+      try {
+        eventTime = new Date(`${event.date} ${event.time}`);
+      } catch (err) {
+        console.error("Invalid date format:", event.date, event.time);
+      }
+    }
+    
     const isCompleted = completed.includes(event.event_name);
-
-    let category = "upcoming";
-    if (isCompleted) category = "completed";
-    else if (eventTime < now) category = "missed";
-    else upcoming.push(event);
 
     const card = document.createElement("div");
     card.className = "card";
@@ -161,7 +213,11 @@ function handleStatusChange(event, isComplete) {
   else completed.delete(event.event_name);
 
   localStorage.setItem("completedEvents", JSON.stringify([...completed]));
-  fetchAllUnreadEmails(); // re-render everything
+  
+  // Re-fetch events to update everything
+  if (accessToken) {
+    fetchAllUnreadEmails();
+  }
 }
 
 // Setup event search
@@ -210,28 +266,45 @@ function updateSummary(events) {
   const today = new Date();
   const weekStart = new Date(today);
   weekStart.setDate(today.getDate() - today.getDay());
+  weekStart.setHours(0, 0, 0, 0);
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);
+  weekEnd.setHours(23, 59, 59, 999);
 
   const total = events.length;
+  const completedEvents = JSON.parse(localStorage.getItem("completedEvents") || "[]");
+  
+  // Calculate this week events
   const thisWeek = events.filter((ev) => {
-    const dt = new Date(`${ev.date} ${ev.time}`);
-    return dt >= weekStart && dt <= weekEnd;
+    if (!ev.date || !ev.time) return false;
+    try {
+      const dt = new Date(`${ev.date} ${ev.time}`);
+      return dt >= weekStart && dt <= weekEnd;
+    } catch (err) {
+      return false;
+    }
   }).length;
 
-  const completed = JSON.parse(localStorage.getItem("completedEvents") || "[]").length;
+  // Calculate completed, missed, and upcoming
+  const completed = completedEvents.length;
   const missed = events.filter((ev) => {
-    const dt = new Date(`${ev.date} ${ev.time}`);
-    return dt < today && !completed.includes(ev.event_name);
+    if (!ev.date || !ev.time) return false;
+    try {
+      const dt = new Date(`${ev.date} ${ev.time}`);
+      return dt < today && !completedEvents.includes(ev.event_name);
+    } catch (err) {
+      return false;
+    }
   }).length;
   const upcoming = total - completed - missed;
 
+  // Update all counters
   document.getElementById("total-events").textContent = total;
   document.getElementById("this-week-events").textContent = thisWeek;
-  document.getElementById("total-attendees").textContent = total;
-  document.getElementById("upcoming-count").textContent = upcoming;
+  document.getElementById("total-attendees").textContent = completed; // Total attendees = completed events
+  document.getElementById("upcoming-count").textContent = Math.max(0, upcoming);
   document.getElementById("attended-count").textContent = completed;
-  document.getElementById("missed-count").textContent = missed;
+  document.getElementById("missed-count").textContent = Math.max(0, missed);
 }
 
 // Error handler
