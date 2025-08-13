@@ -175,8 +175,12 @@ function renderEvents(events) {
 
   const now = new Date();
   const completed = JSON.parse(localStorage.getItem("completedEvents") || "[]");
+  const deleted = JSON.parse(localStorage.getItem("deletedEvents") || "[]");
 
-  events.forEach((event) => {
+  // Filter out deleted events
+  const filteredEvents = (events || []).filter((ev) => !deleted.includes(ev.event_name));
+
+  filteredEvents.forEach((event) => {
     let eventTime = null;
     if (event.date && event.time) {
       try {
@@ -196,6 +200,13 @@ function renderEvents(events) {
     checkbox.checked = isCompleted;
     checkbox.addEventListener("change", () => handleStatusChange(event, checkbox.checked));
 
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "delete-btn";
+    deleteBtn.type = "button";
+    deleteBtn.title = "Delete event";
+    deleteBtn.textContent = "🗑️";
+    deleteBtn.addEventListener("click", () => handleDeleteEvent(event, card));
+
     card.innerHTML = `
       <div style="color: #8b5cf6; font-weight: bold;">${event.type || "Event"}</div>
       <h2>${event.event_name || "No Title"}</h2>
@@ -205,6 +216,7 @@ function renderEvents(events) {
     `;
 
     card.prepend(checkbox);
+    card.appendChild(deleteBtn);
     list.appendChild(card);
   });
 }
@@ -220,6 +232,36 @@ function handleStatusChange(event, isComplete) {
   // Re-fetch events to update everything
   if (accessToken) {
     fetchAllUnreadEmails();
+  }
+}
+
+// Handle deleting an event card
+function handleDeleteEvent(event, cardElement) {
+  try {
+    if (event && event.isCustom) {
+      const existing = JSON.parse(localStorage.getItem("customEvents") || "[]");
+      const updated = existing.filter((ev) => ev.event_name !== event.event_name);
+      localStorage.setItem("customEvents", JSON.stringify(updated));
+    } else if (event && event.event_name) {
+      const deleted = new Set(JSON.parse(localStorage.getItem("deletedEvents") || "[]"));
+      deleted.add(event.event_name);
+      localStorage.setItem("deletedEvents", JSON.stringify([...deleted]));
+    }
+
+    if (cardElement && cardElement.remove) {
+      cardElement.remove();
+    }
+
+    // Re-render to refresh counts and ensure consistency
+    if (accessToken) {
+      fetchAllUnreadEmails();
+    } else {
+      const merged = getAllEventsWithCustom([]);
+      renderEvents(merged);
+      updateSummary(merged);
+    }
+  } catch (err) {
+    console.error("Failed to delete event:", err);
   }
 }
 
