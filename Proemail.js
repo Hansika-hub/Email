@@ -7,6 +7,7 @@ function toggleSidebar() {
 const BACKEND_URL = "https://email-backend-bu9l.onrender.com";
 let accessToken = localStorage.getItem("accessToken") || null;
 let backendToken = localStorage.getItem("backendToken") || null;
+let idToken = localStorage.getItem("idToken") || null;
 
 // On load, fetch events if already logged in
 window.onload = function () {
@@ -66,8 +67,10 @@ function updateLoginUI() {
 function logout() {
   accessToken = null;
   backendToken = null;
+  idToken = null;
   localStorage.removeItem("accessToken");
   localStorage.removeItem("backendToken");
+  localStorage.removeItem("idToken");
   updateLoginUI();
   
   // Clear all data
@@ -93,13 +96,20 @@ function logout() {
 
 // Handle Google Login
 function handleCredentialResponse(response) {
-  const idToken = response.credential;
+  const receivedIdToken = response.credential;
+  // Persist the ID token in case backend needs it later
+  idToken = receivedIdToken;
+  localStorage.setItem("idToken", idToken);
 
   fetch(`${BACKEND_URL}/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify({ token: idToken }),
+    body: JSON.stringify({
+      token: idToken,
+      id_token: idToken,
+      google_access_token: accessToken || null,
+    }),
   })
     .then((res) => res.json().catch(() => null))
     .then((data) => {
@@ -141,6 +151,7 @@ async function fetchAllUnreadEmails() {
           : accessToken
           ? { Authorization: `Bearer ${accessToken}` }
           : {}),
+        ...(idToken ? { "X-ID-Token": idToken } : {}),
       },
     });
 
@@ -190,15 +201,74 @@ async function fetchAllUnreadEmails() {
               : {}),
           },
           credentials: "include",
-          body: JSON.stringify({}),
+          body: JSON.stringify(
+            idToken
+              ? {
+                  token: idToken,
+                  id_token: idToken,
+                  google_access_token: accessToken || null,
+                }
+              : {}
+          ),
         });
       } catch (postErr) {
         console.error("POST fallback failed:", postErr);
       }
     }
 
+    // If still unauthorized, try POST explicitly with idToken in body and all auth headers
+    if (res.status === 401 && idToken) {
+      try {
+        res = await fetch(`${BACKEND_URL}/process_emails`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(backendToken
+              ? { Authorization: `Bearer ${backendToken}` }
+              : accessToken
+              ? { Authorization: `Bearer ${accessToken}` }
+              : {}),
+            ...(idToken ? { "X-ID-Token": idToken } : {}),
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            token: idToken,
+            id_token: idToken,
+            google_access_token: accessToken || null,
+          }),
+        });
+      } catch (finalPostErr) {
+        console.error("Explicit POST with idToken failed:", finalPostErr);
+      }
+    }
+
+    // Final fallback: send ID token as Bearer Authorization explicitly
+    if (res.status === 401 && idToken) {
+      try {
+        res = await fetch(`${BACKEND_URL}/process_emails`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            token: idToken,
+            id_token: idToken,
+            google_access_token: accessToken || null,
+          }),
+        });
+      } catch (authIdBearerErr) {
+        console.error("POST with Authorization: Bearer <idToken> failed:", authIdBearerErr);
+      }
+    }
+
     if (!res.ok) {
-      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      let errorText = "";
+      try {
+        errorText = await res.text();
+      } catch (_) {}
+      throw new Error(`HTTP ${res.status}: ${res.statusText}${errorText ? ` - ${errorText}` : ""}`);
     }
 
     const allEvents = await res.json();
@@ -212,7 +282,7 @@ async function fetchAllUnreadEmails() {
 
   } catch (err) {
     console.error("Fetching emails failed:", err);
-    showError("Failed to fetch emails.");
+    showError(`Failed to fetch emails. ${err && err.message ? err.message : ""}`);
   }
 }
 
