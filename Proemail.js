@@ -143,21 +143,22 @@ async function fetchAllUnreadEmails() {
     const emailError = document.getElementById("email-error");
     emailError.style.display = "none";
     
+    // Require Gmail OAuth access token
+    if (!accessToken) {
+      showError("Not logged in. Please sign in with Google.");
+      return;
+    }
+    
     let res = await fetch(`${BACKEND_URL}/process_emails`, {
       method: "GET",
       credentials: "include",
       headers: {
-        ...(backendToken
-          ? { Authorization: `Bearer ${backendToken}` }
-          : accessToken
-          ? { Authorization: `Bearer ${accessToken}` }
-          : {}),
-        ...(idToken ? { "X-ID-Token": idToken } : {}),
+        Authorization: `Bearer ${accessToken}`,
       },
     });
 
     // If unauthorized, try to refresh Google access token silently (if using it)
-    if (res.status === 401 && !backendToken && accessToken) {
+    if (res.status === 401) {
       try {
         await new Promise((resolve, reject) => {
           try {
@@ -186,6 +187,37 @@ async function fetchAllUnreadEmails() {
       } catch (refreshErr) {
         console.error("Silent token refresh failed:", refreshErr);
       }
+
+      // If still unauthorized, force consent to ensure gmail.readonly scope is granted
+      if (res.status === 401) {
+        try {
+          await new Promise((resolve, reject) => {
+            try {
+              google.accounts.oauth2
+                .initTokenClient({
+                  client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
+                  scope: "https://www.googleapis.com/auth/gmail.readonly",
+                  callback: (tokenResponse) => {
+                    accessToken = tokenResponse.access_token;
+                    localStorage.setItem("accessToken", accessToken);
+                    resolve();
+                  },
+                })
+                .requestAccessToken({ prompt: "consent" });
+            } catch (e) {
+              reject(e);
+            }
+          });
+
+          res = await fetch(`${BACKEND_URL}/process_emails`, {
+            method: "GET",
+            credentials: "include",
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+        } catch (consentErr) {
+          console.error("Consent token request failed:", consentErr);
+        }
+      }
     }
 
     // Fallback to POST if backend doesn't allow GET (405 Method Not Allowed)
@@ -195,74 +227,16 @@ async function fetchAllUnreadEmails() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            ...(backendToken
-              ? { Authorization: `Bearer ${backendToken}` }
-              : accessToken
-              ? { Authorization: `Bearer ${accessToken}` }
-              : {}),
+            Authorization: `Bearer ${accessToken}`,
           },
           credentials: "include",
-          body: JSON.stringify(
-            idToken
-              ? {
-                  token: idToken,
-                  id_token: idToken,
-                  google_access_token: accessToken || null,
-                }
-              : {}
-          ),
+          body: JSON.stringify({}),
         });
       } catch (postErr) {
         console.error("POST fallback failed:", postErr);
       }
     }
 
-    // If still unauthorized, try POST explicitly with idToken in body and all auth headers
-    if (res.status === 401 && idToken) {
-      try {
-        res = await fetch(`${BACKEND_URL}/process_emails`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(backendToken
-              ? { Authorization: `Bearer ${backendToken}` }
-              : accessToken
-              ? { Authorization: `Bearer ${accessToken}` }
-              : {}),
-            ...(idToken ? { "X-ID-Token": idToken } : {}),
-          },
-          credentials: "include",
-          body: JSON.stringify({
-            token: idToken,
-            id_token: idToken,
-            google_access_token: accessToken || null,
-          }),
-        });
-      } catch (finalPostErr) {
-        console.error("Explicit POST with idToken failed:", finalPostErr);
-      }
-    }
-
-    // Final fallback: send ID token as Bearer Authorization explicitly
-    if (res.status === 401 && idToken) {
-      try {
-        res = await fetch(`${BACKEND_URL}/process_emails`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${idToken}`,
-          },
-          credentials: "include",
-          body: JSON.stringify({
-            token: idToken,
-            id_token: idToken,
-            google_access_token: accessToken || null,
-          }),
-        });
-      } catch (authIdBearerErr) {
-        console.error("POST with Authorization: Bearer <idToken> failed:", authIdBearerErr);
-      }
-    }
 
     if (!res.ok) {
       let errorText = "";
