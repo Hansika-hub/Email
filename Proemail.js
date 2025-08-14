@@ -99,7 +99,7 @@ function handleCredentialResponse(response) {
     .then(() => {
       google.accounts.oauth2.initTokenClient({
         client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
-        scope: "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.events",
+        scope: "https://www.googleapis.com/auth/gmail.readonly",
         callback: (tokenResponse) => {
           accessToken = tokenResponse.access_token;
           localStorage.setItem("accessToken", accessToken);
@@ -238,8 +238,6 @@ function handleStatusChange(event, isComplete) {
 // Handle deleting an event card
 function handleDeleteEvent(event, cardElement) {
   try {
-    // Best-effort: delete from Google Calendar
-    deleteGoogleCalendarEvent(event).catch(() => {});
     if (event && event.isCustom) {
       const existing = JSON.parse(localStorage.getItem("customEvents") || "[]");
       const updated = existing.filter((ev) => ev.event_name !== event.event_name);
@@ -264,130 +262,6 @@ function handleDeleteEvent(event, cardElement) {
     }
   } catch (err) {
     console.error("Failed to delete event:", err);
-  }
-}
-
-// Ensure Calendar scope
-async function ensureCalendarScope() {
-  return new Promise((resolve) => {
-    try {
-      google.accounts.oauth2.initTokenClient({
-        client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
-        scope: "https://www.googleapis.com/auth/calendar.events",
-        prompt: "",
-        callback: (tokenResponse) => {
-          if (tokenResponse && tokenResponse.access_token) {
-            accessToken = tokenResponse.access_token;
-            localStorage.setItem("accessToken", accessToken);
-          }
-          resolve();
-        },
-      }).requestAccessToken();
-    } catch (_) {
-      resolve();
-    }
-  });
-}
-
-// Create Calendar event for custom
-async function createCalendarEventForCustom(event) {
-  if (!accessToken) return null;
-  try {
-    await ensureCalendarScope();
-    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-    const startISO = toISODateTime(event.date, event.time, timeZone);
-    if (!startISO) return null;
-    const endISO = new Date(new Date(startISO).getTime() + 60 * 60 * 1000).toISOString();
-
-    const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        summary: event.event_name || "Event",
-        location: event.venue || "",
-        description: "Created by Event Email Extractor",
-        start: { dateTime: startISO, timeZone },
-        end: { dateTime: endISO, timeZone },
-      }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data && data.id ? data.id : null;
-  } catch (_) {
-    return null;
-  }
-}
-
-// Try to find Calendar event id
-async function findCalendarEventId(event) {
-  if (!accessToken) return null;
-  try {
-    await ensureCalendarScope();
-    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-    const startISO = toISODateTime(event.date, event.time, timeZone);
-    if (!startISO) return null;
-    const eventTime = new Date(startISO);
-    const timeMin = new Date(eventTime.getTime() - 2 * 60 * 60 * 1000).toISOString();
-    const timeMax = new Date(eventTime.getTime() + 2 * 60 * 60 * 1000).toISOString();
-    const query = encodeURIComponent(event.event_name || "");
-
-    const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&maxResults=10&timeMin=${timeMin}&timeMax=${timeMax}&q=${query}`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const items = (data && data.items) || [];
-    let best = null;
-    let bestDelta = Number.POSITIVE_INFINITY;
-    items.forEach((it) => {
-      const start = it.start && (it.start.dateTime || it.start.date);
-      if (!start) return;
-      const ts = new Date(start).getTime();
-      const delta = Math.abs(ts - eventTime.getTime());
-      if (delta < bestDelta) {
-        best = it;
-        bestDelta = delta;
-      }
-    });
-    return best && best.id ? best.id : null;
-  } catch (_) {
-    return null;
-  }
-}
-
-// Delete from Google Calendar
-async function deleteGoogleCalendarEvent(event) {
-  if (!accessToken) return;
-  try {
-    await ensureCalendarScope();
-    let gcalId = null;
-    if (event && event.isCustom && event.gcalEventId) {
-      gcalId = event.gcalEventId;
-    } else {
-      gcalId = await findCalendarEventId(event);
-    }
-    if (!gcalId) return;
-    await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(gcalId)}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-  } catch (_) {
-    // ignore
-  }
-}
-
-function toISODateTime(dateStr, timeStr, tz) {
-  try {
-    if (!dateStr || !timeStr) return null;
-    const [y, m, d] = dateStr.split("-").map((v) => parseInt(v, 10));
-    const [hh, mm] = timeStr.split(":").map((v) => parseInt(v, 10));
-    const dt = new Date(Date.UTC(y, (m || 1) - 1, d || 1, hh || 0, mm || 0));
-    const local = new Date(dt.toLocaleString("en-US", { timeZone: tz }));
-    return new Date(local).toISOString();
-  } catch (_) {
-    return null;
   }
 }
 
@@ -543,30 +417,26 @@ function initializeAddEventFlow() {
     };
 
     const existing = JSON.parse(localStorage.getItem("customEvents") || "[]");
+    existing.unshift(newEvent);
+    localStorage.setItem("customEvents", JSON.stringify(existing));
 
-    // Try to create a Google Calendar event; persist its id if created
-    createCalendarEventForCustom(newEvent)
-      .then((gcalEventId) => {
-        if (gcalEventId) newEvent.gcalEventId = gcalEventId;
-      })
-      .catch(() => {})
-      .finally(() => {
-        existing.unshift(newEvent);
-        localStorage.setItem("customEvents", JSON.stringify(existing));
+    // Re-render events combining custom + fetched if logged in, else just custom
+    if (accessToken) {
+      // Attempt to merge with latest fetched events by reusing the last known list on the page
+      // If we don't have it, just render custom for now; next fetch will merge
+      const currentCards = document.querySelectorAll("#events-list .card h2");
+      const currentEventNames = Array.from(currentCards).map((h) => h.textContent);
+      // No reliable reconstruction of fetched event objects here; trigger a refetch if logged in
+      fetchAllUnreadEmails();
+    } else {
+      renderEvents(getAllEventsWithCustom([]));
+      updateSummary(getAllEventsWithCustom([]));
+    }
 
-        // Re-render events combining custom + fetched if logged in, else just custom
-        if (accessToken) {
-          fetchAllUnreadEmails();
-        } else {
-          renderEvents(getAllEventsWithCustom([]));
-          updateSummary(getAllEventsWithCustom([]));
-        }
+    // Optional: schedule notification for the custom event
+    scheduleNotifications([newEvent]);
 
-        // Optional: schedule notification for the custom event
-        scheduleNotifications([newEvent]);
-
-        closeModal();
-      });
+    closeModal();
   });
 }
 
