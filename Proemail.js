@@ -121,10 +121,26 @@ async function fetchAllUnreadEmails() {
     const emailError = document.getElementById("email-error");
     emailError.style.display = "none";
     
-    const res = await fetch(`${BACKEND_URL}/process_emails`, {
+    let res = await fetch(`${BACKEND_URL}/process_emails`, {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}` },
     });
+
+    // Fallback to POST if backend doesn't allow GET (405 Method Not Allowed)
+    if (res.status === 405) {
+      try {
+        res = await fetch(`${BACKEND_URL}/process_emails`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({}),
+        });
+      } catch (postErr) {
+        console.error("POST fallback failed:", postErr);
+      }
+    }
 
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}: ${res.statusText}`);
