@@ -6,6 +6,7 @@ function toggleSidebar() {
 
 const BACKEND_URL = "https://email-backend-bu9l.onrender.com";
 let accessToken = localStorage.getItem("accessToken") || null;
+let backendToken = localStorage.getItem("backendToken") || null;
 
 // On load, fetch events if already logged in
 window.onload = function () {
@@ -20,9 +21,11 @@ window.onload = function () {
     google.accounts.id.initialize({
       client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
       callback: handleCredentialResponse,
-      auto_select: true,
+      auto_select: false,
       cancel_on_tap_outside: true,
       itp_support: true,
+      // Force non-FedCM behavior for prompts
+      use_fedcm_for_prompt: false,
     });
 
     const loginButton = document.getElementById("login-button");
@@ -32,7 +35,7 @@ window.onload = function () {
         size: "large",
         width: 300,
       });
-      google.accounts.id.prompt(); // optional One Tap
+      // Disable One Tap to avoid FedCM requirement; users will click the button to sign in
     }
   } catch (err) {
     console.error("GSI Initialization failed:", err);
@@ -62,7 +65,9 @@ function updateLoginUI() {
 // Handle logout
 function logout() {
   accessToken = null;
+  backendToken = null;
   localStorage.removeItem("accessToken");
+  localStorage.removeItem("backendToken");
   updateLoginUI();
   
   // Clear all data
@@ -80,7 +85,7 @@ function logout() {
   
   // Reinitialize Google Sign-In
   try {
-    google.accounts.id.prompt();
+    // One Tap disabled; nothing to prompt here
   } catch (err) {
     console.error("Failed to reinitialize Google Sign-In:", err);
   }
@@ -93,10 +98,16 @@ function handleCredentialResponse(response) {
   fetch(`${BACKEND_URL}/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify({ token: idToken }),
   })
-    .then((res) => res.json())
-    .then(() => {
+    .then((res) => res.json().catch(() => null))
+    .then((data) => {
+      // Capture any backend-issued token if provided
+      if (data && (data.sessionToken || data.token || data.accessToken || data.jwt)) {
+        backendToken = data.sessionToken || data.token || data.accessToken || data.jwt;
+        localStorage.setItem("backendToken", backendToken);
+      }
       google.accounts.oauth2.initTokenClient({
         client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
         scope: "https://www.googleapis.com/auth/gmail.readonly",
@@ -123,8 +134,47 @@ async function fetchAllUnreadEmails() {
     
     let res = await fetch(`${BACKEND_URL}/process_emails`, {
       method: "GET",
-      headers: { Authorization: `Bearer ${accessToken}` },
+      credentials: "include",
+      headers: {
+        ...(backendToken
+          ? { Authorization: `Bearer ${backendToken}` }
+          : accessToken
+          ? { Authorization: `Bearer ${accessToken}` }
+          : {}),
+      },
     });
+
+    // If unauthorized, try to refresh Google access token silently (if using it)
+    if (res.status === 401 && !backendToken && accessToken) {
+      try {
+        await new Promise((resolve, reject) => {
+          try {
+            google.accounts.oauth2
+              .initTokenClient({
+                client_id: "721040422695-9m0ge0d19gqaha28rse2le19ghran03u.apps.googleusercontent.com",
+                scope: "https://www.googleapis.com/auth/gmail.readonly",
+                callback: (tokenResponse) => {
+                  accessToken = tokenResponse.access_token;
+                  localStorage.setItem("accessToken", accessToken);
+                  resolve();
+                },
+              })
+              .requestAccessToken({ prompt: "" });
+          } catch (e) {
+            reject(e);
+          }
+        });
+
+        // retry once with refreshed token
+        res = await fetch(`${BACKEND_URL}/process_emails`, {
+          method: "GET",
+          credentials: "include",
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+      } catch (refreshErr) {
+        console.error("Silent token refresh failed:", refreshErr);
+      }
+    }
 
     // Fallback to POST if backend doesn't allow GET (405 Method Not Allowed)
     if (res.status === 405) {
@@ -133,8 +183,13 @@ async function fetchAllUnreadEmails() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
+            ...(backendToken
+              ? { Authorization: `Bearer ${backendToken}` }
+              : accessToken
+              ? { Authorization: `Bearer ${accessToken}` }
+              : {}),
           },
+          credentials: "include",
           body: JSON.stringify({}),
         });
       } catch (postErr) {
