@@ -4,7 +4,8 @@ function toggleSidebar() {
   document.getElementById("overlay").classList.toggle("show");
 }
 
-const BACKEND_URL = "https://email-backend-bu9l.onrender.com";
+// Route via Vercel rewrite to avoid CORS
+const BACKEND_URL = "/api";
 let accessToken = localStorage.getItem("accessToken") || null;
 let backendToken = localStorage.getItem("backendToken") || null;
 let idToken = localStorage.getItem("idToken") || null;
